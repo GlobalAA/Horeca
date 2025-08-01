@@ -103,6 +103,8 @@ async def vocation_get(callback: CallbackQuery, state: FSMContext):
 		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 	
 	vacancies: list[Vacancies] = await user.vacancies.all() #type: ignore
+	if len(vacancies) <= 0:
+		return await callback.answer("У вас ще немає створених вакансій")
 	vacancy: Vacancies = await vacancies[0]
 
 	await state.update_data(vacancies=[v.id for v in vacancies], index=0)

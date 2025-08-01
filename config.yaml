@@ -1,5 +1,5 @@
 bot_token: '8178441036:AAFC-ANJTNOZ73DFZRlBZhdIRLIjVWfhBZw'
-db_url: ''
+db_url: 'postgres://postgres:0904@localhost:5432/Horeca'
 
 price_options:
   ONE_DAY: 100
