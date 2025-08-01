@@ -379,6 +379,9 @@ async def data_full_get(message: Message, state: FSMContext, user_id: int, photo
 
 	is_vip = PriceOptionEnum.VIP in subscriptions
 
+	if is_vip and user.on_week <= 0:
+		is_vip = False
+
 	vocation_final_reset = vocation_keyboard_price(balance=user.balance, vip=is_vip).inline_keyboard + reset_keyboard_inline
 
 	vocation_final_reset_markup = InlineKeyboardMarkup(inline_keyboard=vocation_final_reset)

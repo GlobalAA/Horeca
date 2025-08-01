@@ -8,7 +8,7 @@ from arq.connections import RedisSettings
 from arq.typing import WorkerSettingsBase
 from arq.worker import Function
 from src.config import config
-
+import logging
 from .functions.mailing import cv_mailing, vacancy_mailing
 from .functions.time_expired import (check_user_time_expired,
                                      check_vacancy_time_expired)
@@ -19,6 +19,8 @@ REDIS_SETTINGS = RedisSettings(
 	username=config.redis.username,
 	password=config.redis.password.get_secret_value()
 )
+
+logging.basicConfig(level=logging.INFO)
 
 async def startup(ctx):
 	print("Startup")
