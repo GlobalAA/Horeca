@@ -1,0 +1,5 @@
+.venv
+migrations_old
+poetry.lock
+pyproject.toml
+__pycache__
