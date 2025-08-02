@@ -6,16 +6,18 @@ from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from callbacks.types import RatingCvData
+from callbacks.types import CommentData, RatingCvData
 from keyboards.cabinet_keyboards import cabinet_keyboard
 from keyboards.city_district_keyboard import city_keyboard
 from keyboards.cv_keyboard import rating_cv_keyboard
 from models.enums import PriceOptionEnum
-from models.models import ExperienceVacancy, Subscriptions, User, Vacancies
+from models.models import (Comment, ExperienceVacancy, Subscriptions, User,
+                           Vacancies)
 from utils import get_min_price, push_state
-from utils.cabinet_text import get_cabinet_text, send_vocation
+from utils.cabinet_text import (comment_slider_button, get_cabinet_text,
+                                send_vocation)
 
-from .states import CVState, VocationState
+from .states import CVComments, CVState, VocationState
 
 router = Router()
 
@@ -105,14 +107,20 @@ async def slider_navigate(callback: CallbackQuery, state: FSMContext):
 	if not user:
 		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 
-	vacancies = []
+	vacancies: list[Vacancies | ExperienceVacancy] = []
 	view_all = callback.data.split(':')[-1] == "True"
 
 	for v in data['vacancies']:
-		if (data := await Vacancies.get_or_none(id=int(v))) != None:
-			vacancies.append(data)
+		data_vac = await Vacancies.get_or_none(id=int(v))
+		if data_vac:
+			vacancies.append(data_vac)
 
-	current_vacancy: Vacancies = vacancies[index]
+	for v in data['experience_vacancies']:
+		data_experience_vacancies = await ExperienceVacancy.get_or_none(id=int(v))
+		if data_experience_vacancies != None:
+			vacancies.append(data_experience_vacancies)
+
+	current_vacancy: Vacancies | ExperienceVacancy = vacancies[index]
 
 	if not vacancies:
 		await callback.message.answer("Немає записів.")
@@ -170,3 +178,82 @@ async def rating_set_callback(callback: CallbackQuery, callback_data: RatingCvDa
 	except Exception as e:
 		print(e)
 		return await message.answer("🔴 Сталася помилка, зверніться до адміністратора")
+	
+@router.callback_query(CommentData.filter(), StateFilter(None))
+async def comment(callback: CallbackQuery, callback_data: CommentData, state: FSMContext):
+	message = cast(Message, callback.message)
+
+	await state.update_data(exp_id=callback_data.exp_id)
+
+	await callback.answer()
+	await message.reply("💬 Надішліть відгук про співробітника")
+
+	await state.set_state(CVComments.set_comment)
+
+@router.message(CVComments.set_comment)
+async def set_comment(message: Message, state: FSMContext):
+	data = await state.get_data()
+	exp_id = int(data.get("exp_id", 0))
+
+	experience = await ExperienceVacancy.get_or_none(id=exp_id)
+
+	if not experience:
+		await state.clear()
+		return await message.answer("🔴 Сталася помилка, зверніться до адміністратора")
+
+	try:
+		comment = Comment(
+			author = message.from_user.full_name,
+			text = message.text,
+			experience = experience
+		)
+
+		await comment.save()
+
+		await state.clear()
+		await message.answer("🟢 Відгук збережено")
+	except Exception as e:
+		print(e)
+		return await message.answer("🔴 Сталася помилка, зверніться до адміністратора")
+	
+@router.callback_query(F.data.startswith("slider_next_comment"))
+@router.callback_query(F.data.startswith("slider_prev_comment"))
+async def slider_navigate_comment(callback: CallbackQuery, state: FSMContext):
+	data = await state.get_data()
+	index = data.get("index", 0)
+
+	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("cvs")
+
+	if not user:
+		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
+
+	comments: list[Comment] = []
+
+	for comment in data['comments']:
+		data_c = await Comment.get_or_none(id=int(comment))
+		if data_c:
+			comments.append(data_c)
+
+	if not comments:
+		await callback.message.answer("Немає записів.")
+		return
+	
+	current_comment = comments[index]
+	
+	if callback.data.startswith("slider_next_comment") and index < len(comments) - 1:
+		index += 1
+	elif callback.data.startswith("slider_prev_comment") and index > 0:
+		index -= 1
+	else:
+		return await callback.answer("Далі немає записів", show_alert=False)
+	
+	message = cast(Message, callback.message)
+	await state.update_data(index=index)
+
+	text = f"""Користувач {current_comment.author}
+{current_comment.text}
+Опубліковано {current_comment.created_at.strftime("%d.%m.%Y")}
+"""
+	
+	await message.delete()
+	await message.answer(text, reply_markup=await comment_slider_button(index, len(comments)))

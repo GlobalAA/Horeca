@@ -68,6 +68,9 @@ class RatingCvData(CallbackData, prefix="rate"):
 	exp_id: int
 	stars: int
 
+class CommentData(CallbackData, prefix="comment"):
+	exp_id: int
+
 class FinalDataVocation(CallbackData, prefix="final_voc"):
 	published: bool
 	price_option: PriceOptionEnum

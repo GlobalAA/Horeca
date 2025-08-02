@@ -21,6 +21,7 @@ from models.enums import (ExperienceEnum, ExperienceTypeEnum, PriceOptionEnum,
                           UserRoleEnum, VocationEnum)
 from models.models import CVs, ExperienceVacancy, User, Vacancies
 from utils.cabinet_text import send_vocation
+from utils.exect_vacancy_exp import get_exactly_experience_vacancy
 
 router_seeker = Router()
 
@@ -72,10 +73,12 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 		"choosing_age_group": "Оберіть вікову групу",
 		"choosing_experience": "Вкажіть досвід роботи",
 		"choosing_experience_type": "Як хочете вказати минуле місце роботи?",
+		"choosing_experience_name": "Вкажіть назву місця роботи",
+		"choosing_experience_vacancy": "Оберіть місце роботи зі списку",
 		"choosing_min_salary": "Вкажіть мінімальну зарплату",
 		"choosing_desired_salary": "Вкажіть бажану зарплату",
 		"choosing_phone_number": "Вкажіть ваш номер телефону",
-		"choosing_photo_id": "Бажаєте додати зображення до резюме? Надішліть"
+		"choosing_photo_id": "Бажаєте додати зображення до резюме? Надішліть",
 	}
 
 
@@ -86,7 +89,14 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 		"choosing_subvocation": lambda uid, data: subvocation_keyboard(uid, data["vocation"]),
 		"choosing_age_group": lambda uid, _: age_group_keyboard(uid),
 		"choosing_experience": lambda uid, _: experience_keyboard(uid),
-		"choosing_experience_type": lambda uid, _: experience_type_keyboard(uid)
+		"choosing_experience_type": lambda uid, _: experience_type_keyboard(uid),
+		"choosing_experience_name": lambda *_: None,
+    "choosing_experience_vacancy": lambda *_: None,
+    "choosing_min_salary": lambda *_: None,
+    "choosing_desired_salary": lambda *_: None,
+    "choosing_phone_number": lambda *_: None,
+    "choosing_photo_id": lambda *_: None,
+    "final_state": lambda *_: None
 	}
 
 	text = text_map.get(state_name, "⬅️ Повернення")
@@ -96,13 +106,12 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 	if state_name in keyboard_map:
 		keyboard = keyboard_map[state_name](uid, data)
 
-		if keyboard:
-			if len(history) > 1:
-				await message.edit_text(text, reply_markup=append_back_button(keyboard, state_name))
-				return await callback.answer()
-			else:
-				await message.edit_text(text, reply_markup=keyboard)
-				return await callback.answer()
+		if len(history) > 1:
+			await message.edit_text(text, reply_markup=append_back_button(keyboard, state_name))
+			return await callback.answer()
+		else:
+			await message.edit_text(text, reply_markup=keyboard)
+			return await callback.answer()
 
 	await message.edit_text(text)
 	await callback.answer()
@@ -143,7 +152,7 @@ async def choosing_vocation_callback(callback: CallbackQuery, callback_data: Voc
 
 	message = cast(Message, callback.message)
 
-	if callback_data.vocation in (VocationEnum.HOSTESS, VocationEnum.CASHIER, VocationEnum.PURCHASER, VocationEnum.CLEANER, VocationEnum.SECURITY, VocationEnum.ACCOUNTANT, VocationEnum.DISHWASHER):
+	if callback_data.vocation in (VocationEnum.HOSTESS, VocationEnum.CASHIER, VocationEnum.PURCHASER, VocationEnum.CLEANER, VocationEnum.SECURITY, VocationEnum.ACCOUNTANT, VocationEnum.HOOKAH):
 		await message.edit_text(
 			"Оберіть вікову групу",
 			reply_markup=append_back_button(age_group_keyboard(callback.from_user.id), "choosing_vocation")
@@ -196,7 +205,7 @@ async def choosing_experience_callback(callback: CallbackQuery, callback_data: E
 	message = cast(Message, callback.message)
 
 	if callback_data.experience == ExperienceEnum.NO_EXPERIENCE:
-		await message.edit_text("Вкажіть мінімальну зарплату")
+		await message.edit_text("Вкажіть мінімальну зарплату", reply_markup=append_back_button(None, "choosing_min_salary"))
 
 		await callback.answer()
 		return await push_state(state, CVState.choosing_min_salary)
@@ -229,22 +238,33 @@ async def choosing_experience_type_callback(callback: CallbackQuery, callback_da
 
 	vacancies: list[Vacancies] = await Vacancies.filter(**filters).all()
 
-	vacancies_found = len(vacancies) > 0
+	exp_vacancies: list[ExperienceVacancy] = await get_exactly_experience_vacancy(filters)
 
-	if callback_data.experience_type == ExperienceTypeEnum.NAME or not vacancies_found:
-		if not vacancies_found:
+	vacancies_found = len(vacancies) > 0
+	exp_vacancies_found = len(exp_vacancies) > 0
+
+	if callback_data.experience_type == ExperienceTypeEnum.SKIP:
+		await message.edit_text("Вкажіть мінімальну зарплату", reply_markup=append_back_button(None, "choosing_experience_vacancy"))
+		await callback.answer()
+		return await push_state(state, CVState.choosing_min_salary)
+	
+	if callback_data.experience_type == ExperienceTypeEnum.NAME or (not vacancies_found and not exp_vacancies_found):
+		if not vacancies_found and callback_data.experience_type != ExperienceTypeEnum.NAME:
 			await message.edit_text("Вакансій по вашому запиту не знайдено")
-			await message.answer("Вкажіть назву місця роботи")
+			await message.answer("Вкажіть назву місця роботи", reply_markup=append_back_button(None, "choosing_experience_name"))
 		else:
-			await message.edit_text("Вкажіть назву місця роботи")
+			await message.edit_text("Вкажіть назву місця роботи", reply_markup=append_back_button(None, "choosing_experience_name"))
 
 		await callback.answer()
 		return await push_state(state, CVState.choosing_experience_name)	
 	
-	text, markup = send_vocation(callback.from_user.full_name, vacancies, 0, len(vacancies), True)
-	vacancy = vacancies[0]	
+	final_vacancies = vacancies + exp_vacancies
+	
+	text, markup = send_vocation(callback.from_user.full_name, final_vacancies, 0, len(vacancies) + len(exp_vacancies), True)
+	vacancy = vacancies[0]
 
 	await state.update_data(vacancies=[v.id for v in vacancies], index=0)
+	await state.update_data(experience_vacancies=[v.id for v in exp_vacancies], exp_index=0)
 
 	if vacancy.photo_id:
 		return await message.answer_photo(vacancy.photo_id, caption=text, reply_markup=markup)
@@ -257,15 +277,20 @@ async def choosing_experience_type_callback(callback: CallbackQuery, callback_da
 @router_seeker.callback_query(CVState.choosing_experience_vacancy, ExperienceVacancyData.filter())
 async def choosing_experience_vacancy(callback: CallbackQuery, callback_data: ExperienceVacancyData, state: FSMContext):
 	vacancy: Vacancies | None = await Vacancies.get_or_none(id=callback_data.vacancy_id)
+	exp_vacancy: ExperienceVacancy | None = await ExperienceVacancy.get_or_none(id=callback_data.vacancy_id)
 	
 	message = cast(Message, callback.message)
 
-	if not vacancy:
+	if not vacancy and not exp_vacancy:
 		return await message.answer("🔴 Будь ласка, зверніться до адміністратора, сталася помилка!")
 	
-	await state.update_data(experience_name=vacancy.name, experience_vacancy_id=vacancy.id)
+	if vacancy:
+		await state.update_data(experience_name=vacancy.name, experience_vacancy_id=vacancy.id)
 
-	await message.edit_text("Вкажіть мінімальну зарплату")
+	if exp_vacancy:
+		await state.update_data(experience_name=exp_vacancy.name, experience_exp_vacancy_id=exp_vacancy.id)
+
+	await message.edit_text("Вкажіть мінімальну зарплату", reply_markup=append_back_button(None, "choosing_experience_vacancy"))
 
 	return await push_state(state, CVState.choosing_min_salary)
 	
@@ -274,7 +299,7 @@ async def choosing_experience_vacancy(callback: CallbackQuery, callback_data: Ex
 async def choosing_experience_name(message: Message, state: FSMContext):
 	await state.update_data(experience_name=message.text)
 
-	await message.answer("Вкажіть мінімальну зарплату")
+	await message.answer("Вкажіть мінімальну зарплату", reply_markup=append_back_button(None, "choosing_experience_name"))
 
 	return await push_state(state, CVState.choosing_min_salary)
 
@@ -289,7 +314,7 @@ async def choosing_min_salary_callback(message: Message, state: FSMContext):
 
 	await state.update_data(min_salary=min_salary)
 
-	await message.answer("Вкажіть бажану зарплату")
+	await message.answer("Вкажіть бажану зарплату", reply_markup=append_back_button(None, "choosing_min_salary"))
 
 	await push_state(state, CVState.choosing_desired_salary)
 
@@ -304,7 +329,7 @@ async def choosing_desired_salary(message: Message, state: FSMContext):
 
 	await state.update_data(desired_salary=desired_salary)
 
-	await message.answer("Вкажіть ваш номер телефону")
+	await message.answer("Вкажіть ваш номер телефону", reply_markup=append_back_button(None, "choosing_desired_salary"))
 
 	await push_state(state, CVState.choosing_phone_number)
 
@@ -408,12 +433,19 @@ async def cv_final_state(callback: CallbackQuery, callback_data: FinalDataCv, st
 		return await message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 	
 	vacancy_id = data.get('experience_vacancy_id', None)
+
+	if not vacancy_id:
+		vacancy_id = data.get('experience_exp_vacancy_id', None)
 	
-	vacancy: Vacancies | None = None
+	vacancy: Vacancies | ExperienceVacancy | None = None
 	subscriptions: list[PriceOptionEnum] = []
 
 	if vacancy_id:
 		vacancy = await Vacancies.get_or_none(id=vacancy_id).prefetch_related("user")
+
+		if not vacancy:
+			vacancy = await ExperienceVacancy.get_or_none(id=vacancy_id).prefetch_related("user")
+
 		subscriptions = [sub.status for sub in user.subscriptions] # type: ignore
 		
 		if not vacancy:
@@ -444,10 +476,23 @@ async def cv_final_state(callback: CallbackQuery, callback_data: FinalDataCv, st
 	try:
 		experience_vacancy = ExperienceVacancy(
 			experience = data['experience'],
-			name = data['experience_name'],
-			vacancy = vacancy,
-			cv_user = user
+			name = data.get('experience_name', None),
+			user = user
 		)
+
+		if vacancy:
+			experience_vacancy.city = vacancy.city
+			experience_vacancy.district = vacancy.district
+			experience_vacancy.vocation = vacancy.vocation
+			experience_vacancy.subvocation = vacancy.subvocation
+			experience_vacancy.rate = vacancy.rate
+			experience_vacancy.salary = vacancy.salary
+			experience_vacancy.phone_number = vacancy.phone_number
+			experience_vacancy.telegram_link = vacancy.telegram_link
+			experience_vacancy.communications = vacancy.communications
+			experience_vacancy.work_schedule = vacancy.work_schedule
+			experience_vacancy.issuance_salary = vacancy.issuance_salary
+			experience_vacancy.age_group = vacancy.age_group
 
 		await experience_vacancy.save()
 		
@@ -470,18 +515,20 @@ async def cv_final_state(callback: CallbackQuery, callback_data: FinalDataCv, st
 
 		if vacancy_id and PriceOptionEnum.VIEW_COMMENTS in subscriptions:
 			if new_cv.photo_id:
-				await bot.send_photo(
+				message_bot = await bot.send_photo(
 					vacancy.user.user_id,
 					photo=new_cv.photo_id,
 					caption=f"🟢 Користувач (<b><i>{full_name}</i></b>) вибрав ваш заклад (<b><i>{vacancy.name}</i></b>) в якості минулого місця роботи!\n\n{full_data}",
 					reply_markup=rating_cv_button(exp_id=experience_vacancy.id)
 				)
+				await bot.pin_chat_message(vacancy.user.user_id, message_bot.message_id)
 			else:
-				await bot.send_message(
+				message_bot = await bot.send_message(
 					vacancy.user.user_id,
 					f"🟢 Користувач (<b><i>{full_name}</i></b>) вибрав ваш заклад (<b><i>{vacancy.name}</i></b>) в якості минулого місця роботи!\n\n{full_data}",
 					reply_markup=rating_cv_button(exp_id=experience_vacancy.id)
 				)
+				await bot.pin_chat_message(vacancy.user.user_id, message_bot.message_id)
 
 		await message.reply(f"🟢 Резюме збережено{", вам будуть приходити повідомлення, якщо з'являться вакансії, які будуть підходити під ваше резюме" if callback_data.published else ''}")
 		await callback.answer()

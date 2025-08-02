@@ -49,6 +49,7 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 	history: list[str] = data.get("history", [])
 
 	if len(history) <= 1:
+		print(history)
 		return await callback.answer("🔴 Немає куди повертатись")
 
 	history.pop()
@@ -57,32 +58,50 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 
 	target_state = getattr(VocationState, state_name, None)
 	if not target_state:
+		print(target_state, state_name)
 		return await callback.answer("🔴 Неможливо повернутись назад")
 
 	await state.update_data(history=history)
 	await push_state(state, target_state)
 
 	text_map = {
-		"choosing_city": "Оберіть місто",
-		"choosing_district": "Оберіть район",
-		"choosing_vocation": "Виберіть сферу діяльності",
-		"choosing_subvocation": "Виберіть підвакансію",
-		"choosing_age_group": "Оберіть вікову групу",
-		"choosing_experience": "Вкажіть досвід роботи",
-		"choosing_rate_type": "Виберіть тип ставки в день",
-		"choosing_communications": "Виберіть метод комунікації",
-		"choosing_photo_id": "Бажаєте додати зображення до вакансії? Надішліть"
-	}
+    "choosing_city": "Оберіть місто",
+    "choosing_district": "Оберіть район",
+    "choosing_vocation": "Виберіть сферу діяльності",
+    "choosing_subvocation": "Виберіть підвакансію",
+    "choosing_name": "Вкажіть назву закладу",
+    "choosing_address": "Вкажіть адресу закладу",
+    "choosing_work_schedule": "Вкажіть графік роботи",
+    "choosing_age_group": "Оберіть вікову групу",
+    "choosing_experience": "Вкажіть досвід роботи",
+    "choosing_salary": "Вкажіть заробітну плату",
+    "choosing_rate_type": "Виберіть тип ставки в день",
+    "choosing_rate": "Введіть ставку",
+    "choosing_issuance_salary": "Вкажіть формати видачі заробітної плати\n\nПриклад: раз в місяць, раз в день",
+    "choosing_communications": "Виберіть метод комунікації",
+    "choosing_phone_number": "Вкажіть номер телефону",
+    "choosing_telegram_link": "Надішліть посилання на телеграм, або тег",
+    "choosing_photo_id": "Бажаєте додати зображення до вакансії? Надішліть або натисніть кнопку",
+}
 
 	keyboard_map = {
-		"choosing_city": lambda uid, _: city_keyboard(uid),
-		"choosing_district": lambda uid, d: district_keyboard(uid, d["city"]),
-		"choosing_vocation": lambda uid, _: vocation_keyboard(uid),
-		"choosing_subvocation": lambda uid, d: subvocation_keyboard(uid, d["vocation"]),
-		"choosing_age_group": lambda uid, _: age_group_keyboard(uid),
-		"choosing_experience": lambda uid, _: experience_keyboard(uid),
-		"choosing_rate_type": lambda uid, _: rate_type_keyboard(uid),
-		"choosing_communications": lambda uid, _: communication_method_keyboard(uid),
+    "choosing_city": lambda uid, _: city_keyboard(uid),
+    "choosing_district": lambda uid, d: district_keyboard(uid, d["city"]),
+    "choosing_vocation": lambda uid, _: vocation_keyboard(uid),
+    "choosing_subvocation": lambda uid, d: subvocation_keyboard(uid, d["vocation"]),
+    "choosing_age_group": lambda uid, _: age_group_keyboard(uid),
+    "choosing_experience": lambda uid, _: experience_keyboard(uid),
+    "choosing_rate_type": lambda uid, _: rate_type_keyboard(uid),
+    "choosing_communications": lambda uid, _: communication_method_keyboard(uid),
+    "choosing_name": lambda *_: None,
+    "choosing_address": lambda *_: None,
+    "choosing_work_schedule": lambda *_: None,
+    "choosing_salary": lambda *_: None,
+    "choosing_rate": lambda uid, _: None,
+    "choosing_issuance_salary": lambda *_: None,
+    "choosing_phone_number": lambda *_: None,
+    "choosing_telegram_link": lambda *_: None,
+    "choosing_photo_id": lambda uid, _: None,
 	}
 
 	text = text_map.get(state_name, "⬅️ Повернення")
@@ -90,18 +109,12 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 	message = cast(Message, callback.message)
 
 	if state_name in keyboard_map:
-		try:
-			keyboard = keyboard_map[state_name](uid, data)
-		except Exception:
-			keyboard = None
-
-		if keyboard:
-			omit_states = ["choosing_age_group", "choosing_communications", "choosing_rate_type"]
-			await message.edit_text(
-				text,
-				reply_markup=append_back_button(keyboard, state_name, UserRoleEnum.EMPLOYER) if len(history) > 1 and not state_name in omit_states else keyboard
-			)
-			return await callback.answer()
+		keyboard = keyboard_map[state_name](uid, data)
+		await message.edit_text(
+			text,
+			reply_markup=append_back_button(keyboard, state_name, UserRoleEnum.EMPLOYER)
+		)
+		return await callback.answer()
 
 	await message.edit_text(text)
 	await callback.answer()
@@ -142,7 +155,7 @@ async def choosing_vocation_callback(callback: CallbackQuery, callback_data: Voc
 	message = cast(Message, callback.message)
 	
 	if callback_data.vocation in (VocationEnum.HOSTESS, VocationEnum.CASHIER, VocationEnum.PURCHASER, VocationEnum.CLEANER, VocationEnum.SECURITY, VocationEnum.ACCOUNTANT, VocationEnum.HOOKAH):
-		await message.answer("Вкажіть назву закладу",)
+		await message.answer("Вкажіть назву закладу", reply_markup=append_back_button(None, "choosing_name", UserRoleEnum.EMPLOYER))
 
 		await callback.answer()
 		return await push_state(state, VocationState.choosing_name)
@@ -161,7 +174,7 @@ async def choosing_subvocation_callback(callback: CallbackQuery, callback_data: 
 
 	message = cast(Message, callback.message)
 	
-	await message.edit_text("Вкажіть назву закладу")  
+	await message.edit_text("Вкажіть назву закладу", reply_markup=append_back_button(None, "choosing_subvocation", UserRoleEnum.EMPLOYER)) 
 
 	await callback.answer()
 	await push_state(state, VocationState.choosing_name)
@@ -170,14 +183,14 @@ async def choosing_subvocation_callback(callback: CallbackQuery, callback_data: 
 async def choosing_name(message: Message, state: FSMContext):
 	await state.update_data(name=message.text)
 
-	await message.answer("Вкажіть адресу закладу")
+	await message.answer("Вкажіть адресу закладу", reply_markup=append_back_button(None, "choosing_name", UserRoleEnum.EMPLOYER))
 	await push_state(state, VocationState.choosing_address)
 
 @router_employer.message(VocationState.choosing_address)
 async def choosing_address(message: Message, state: FSMContext):
 	await state.update_data(address=message.text)
 	
-	await message.answer("Вкажіть графік роботи")  
+	await message.answer("Вкажіть графік роботи", reply_markup=append_back_button(None, "choosing_address", UserRoleEnum.EMPLOYER))  
 
 	await push_state(state, VocationState.choosing_work_schedule)
 
@@ -187,7 +200,7 @@ async def choosing_work_schedule(message: Message, state: FSMContext):
 
 	await message.answer(
 		"Оберіть вікову групу",
-		reply_markup=age_group_keyboard(message.from_user.id)
+		reply_markup=append_back_button(age_group_keyboard(message.from_user.id), "choosing_work_schedule", UserRoleEnum.EMPLOYER)
 	)  
 
 	await push_state(state, VocationState.choosing_age_group)
@@ -213,7 +226,7 @@ async def choosing_experience(callback: CallbackQuery, callback_data: Experience
 
 	message = cast(Message, callback.message)
 
-	await message.edit_text("Вкажіть заробітну плату")
+	await message.edit_text("Вкажіть заробітну плату", reply_markup=append_back_button(None, "choosing_experience", UserRoleEnum.EMPLOYER))
 
 	await callback.answer()
 	await push_state(state, VocationState.choosing_salary)
@@ -231,7 +244,7 @@ async def choosing_salary(message: Message, state: FSMContext):
 
 	await message.answer(
 		"Виберіть тип ставки в день", 
-		reply_markup=rate_type_keyboard(message.from_user.id)
+		reply_markup=append_back_button(rate_type_keyboard(message.from_user.id), "choosing_salary", UserRoleEnum.EMPLOYER)
 	)
 
 	await push_state(state, VocationState.choosing_rate_type)
@@ -240,7 +253,7 @@ async def choosing_salary(message: Message, state: FSMContext):
 async def choosing_rate_type(callback: CallbackQuery, callback_data: RateTypeData, state: FSMContext):
 	await state.update_data(rate_type=callback_data.rate_type)
 
-	await callback.message.answer("Введіть ставку")
+	await callback.message.answer("Введіть ставку", reply_markup=append_back_button(None, "choosing_rate_type", UserRoleEnum.EMPLOYER))
 
 	await callback.answer()
 	await push_state(state, VocationState.choosing_rate)
@@ -257,7 +270,7 @@ async def choosing_rate(message: Message, state: FSMContext):
 
 	await state.update_data(rate=message.text)
 
-	await message.answer("Вкажіть формати видачі заробітної плати\n\nПриклад: раз в місяць, раз в день")
+	await message.answer("Вкажіть формати видачі заробітної плати\n\nПриклад: раз в місяць, раз в день", reply_markup=append_back_button(None, "choosing_rate", UserRoleEnum.EMPLOYER))
 
 	await push_state(state, VocationState.choosing_issuance_salary)
 
@@ -267,7 +280,10 @@ async def choosing_issuance_salary(message: Message, state: FSMContext):
 
 	await state.update_data(issuance_salary=issuance_salary)
 
-	await message.answer("Виберіть метод комунікації", reply_markup=communication_method_keyboard(message.from_user.id))
+	await message.answer(
+		"Виберіть метод комунікації", 
+		reply_markup=append_back_button(communication_method_keyboard(message.from_user.id), "choosing_issuance_salary", UserRoleEnum.EMPLOYER)
+	)
 
 	await push_state(state, VocationState.choosing_communications)
 
@@ -281,7 +297,7 @@ async def choosing_communication_method(callback: CallbackQuery, callback_data: 
 
 	text = "Вкажіть номер телефону" if callback_data.method == CommunicationMethodEnum.PhoneCommunication else "Надішліть посилання на телеграм, або тег"
 
-	await message.edit_text(text)
+	await message.edit_text(text, reply_markup=append_back_button(None, "choosing_communications", UserRoleEnum.EMPLOYER))
 
 
 	await push_state(state, VocationState.choosing_phone_number if callback_data.method == CommunicationMethodEnum.PhoneCommunication else VocationState.choosing_telegram_link)
@@ -317,7 +333,7 @@ async def choosing_phone_number(message: Message, state: FSMContext):
 
 	await message.answer(
 		"Бажаєте додати зображення до вакансії? Надішліть",
-		reply_markup=append_back_button(builder.as_markup(), "choosing_phone_number", UserRoleEnum.EMPLOYER)
+		reply_markup=append_back_button(builder.as_markup(), "choosing_phone_number" if is_choosing_phone_number else "choosing_telegram_link", UserRoleEnum.EMPLOYER)
 	)
 
 	await push_state(state, VocationState.choosing_photo_id)

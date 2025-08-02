@@ -4,12 +4,12 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from callbacks.types import ExperienceVacancyData
 from keyboards.back_keyboard import append_back_button
 from models.enums import PriceOptionEnum
-from models.models import Subscriptions, User, Vacancies
+from models.models import ExperienceVacancy, Subscriptions, User, Vacancies
 
 
 def format_subscriptions(subscriptions: list [Subscriptions]):
 	if not subscriptions:
-			return "У вас нет активных подписок 🍂"
+		return "У вас немає активних підписок🍂"
 	
 	text_map = {
 		PriceOptionEnum.FREE: "Безкоштовний",
@@ -38,7 +38,7 @@ def get_cabinet_text(callback: CallbackQuery | Message, user: User, len_cv: int,
 📰 Кількість створених вакансій: {len_vacancies} шт
 """
 
-def send_vocation(full_name: str, vocations: list[Vacancies], index: int, total: int, view_all: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+def send_vocation(full_name: str, vocations: list[Vacancies | ExperienceVacancy], index: int, total: int, view_all: bool = False) -> tuple[str, InlineKeyboardMarkup]:
 	vocation_model = vocations[index]
 	phone_number = vocation_model.phone_number
 	telegram_link = vocation_model.telegram_link
@@ -95,3 +95,20 @@ def send_vocation(full_name: str, vocations: list[Vacancies], index: int, total:
 		else:
 			builder.adjust(1, 1, 1)
 		return text, builder.as_markup()
+	
+async def comment_slider_button(index: int, total: int) -> InlineKeyboardMarkup:
+	builder = InlineKeyboardBuilder()
+
+	if index > 0:
+		builder.button(text="⬅️ Назад", callback_data=f"slider_prev_comment")
+	if index < total - 1:
+		builder.button(text="➡️ Вперед", callback_data=f"slider_next_comment")
+
+	builder.button(text="Повернутися у профіль", callback_data="back_to_profile")
+
+	if index > 0 and index < total - 1:
+		builder.adjust(2, 1)
+	else:
+		builder.adjust(1, 1)
+
+	return builder.as_markup()

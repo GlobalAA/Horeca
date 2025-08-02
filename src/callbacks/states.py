@@ -39,3 +39,6 @@ class VocationState(StatesGroup):
 	
 class VocationSlider(StatesGroup):
 	viewing = State()
+
+class CVComments(StatesGroup):
+	set_comment = State()

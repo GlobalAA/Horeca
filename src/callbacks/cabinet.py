@@ -11,9 +11,9 @@ from config import config
 from keyboards import get_cvs_keyboard
 from keyboards.vocation_keybaord import vocation_keyboard_price
 from models.enums import PriceOptionEnum
-from models.models import CVs, User, Vacancies
+from models.models import Comment, CVs, ExperienceVacancy, User, Vacancies
 from utils import get_min_price
-from utils.cabinet_text import send_vocation
+from utils.cabinet_text import comment_slider_button, send_vocation
 
 cabinet_router = Router()
 
@@ -32,7 +32,11 @@ async def get_cvs(callback: CallbackQuery):
 		return await callback.answer("У вас ще немає створених резюме")
 
 	message = cast(Message, callback.message)
-	rating = cv.experience.rating
+	
+	if cv.experience:
+		rating = cv.experience.rating
+	else:
+		rating = 0
 
 	text = f"""{callback.from_user.full_name if not full_name else full_name}
 ➖➖➖➖➖
@@ -44,8 +48,7 @@ async def get_cvs(callback: CallbackQuery):
 👨‍🦳 Вік: до {cv.age_group}
 ➖➖➖➖➖
 💡 Досвід роботи: {cv.experience.experience.value}
-💻 Минуле місце роботи: {cv.experience.name.capitalize()}
-{f"🤩 Оцінка: {'⭐️'* rating}" if rating > 0 else ''}
+💻 Минуле місце роботи: {cv.experience.name.capitalize() if cv.experience.name else 'Не вказано'}{f"\n🤩 Оцінка: {'⭐️'* rating}" if rating > 0 else ""}
 ➖➖➖➖➖
 📞 Телефон: {cv.phone_number}"""
 	
@@ -102,10 +105,10 @@ async def vocation_get(callback: CallbackQuery, state: FSMContext):
 	if not user:
 		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 	
-	vacancies: list[Vacancies] = await user.vacancies.all() #type: ignore
+	vacancies: list[Vacancies | ExperienceVacancy] = await user.vacancies.all() #type: ignore
 	if len(vacancies) <= 0:
 		return await callback.answer("У вас ще немає створених вакансій")
-	vacancy: Vacancies = await vacancies[0]
+	vacancy: Vacancies | ExperienceVacancy = await vacancies[0]
 
 	await state.update_data(vacancies=[v.id for v in vacancies], index=0)
 
@@ -224,3 +227,28 @@ async def extend_publication_next(callback: CallbackQuery, callback_data: Extend
 	
 	await state.clear()
 	await callback.answer()
+
+@cabinet_router.callback_query(F.data == "view_comments")
+async def view_comments(callback: CallbackQuery, state: FSMContext):
+	message = cast(Message, callback.message)
+
+	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("cvs")
+
+	if not user:
+		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
+
+	cv: CVs = await user.cvs.all().first().prefetch_related("experience__comments") #type: ignore
+	comments: list[Comment] = await cv.experience.comments.all() #type: ignore
+	
+	if len(comments) <= 0:
+		return await message.answer("До вашої вакансії коментарів не знайдено")
+	
+	await state.update_data(comments=[comment.id for comment in comments], index=0)
+
+	comment = comments[0]
+
+	text = f"""Користувач {comment.author}
+{comment.text}
+Опубліковано {comment.created_at.strftime("%d.%m.%Y")}
+"""
+	await message.answer(text, reply_markup=await comment_slider_button(0, len(comments)))

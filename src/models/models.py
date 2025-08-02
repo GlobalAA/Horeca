@@ -66,15 +66,37 @@ class ExperienceVacancy(Model):
 	id = fields.IntField(pk=True)
 	
 	experience = fields.CharEnumField(ExperienceEnum)
-	name = fields.CharField(max_length=255)
+	name = fields.CharField(max_length=255, null=True)
+	city = fields.CharEnumField(CityEnum, null=True)
+	district = fields.CharField(max_length=255, null=True)
+	vocation = fields.CharEnumField(VocationEnum, null=True)
+	subvocation = fields.CharField(max_length=255, null=True)
+	rate = fields.CharField(max_length=255, null=True)
+	age_group = fields.IntEnumField(AgeGroupEnum, null=True)
+	salary = fields.IntField(null=True)
+	phone_number = fields.CharField(max_length=255, null=True)
+	telegram_link = fields.CharField(max_length=255, null=True)
+	photo_id = fields.CharField(max_length=255, null=True)
+	communications = fields.CharEnumField(CommunicationMethodEnum, null=True)
+	work_schedule = fields.CharField(max_length=255, null=True)
+	issuance_salary = fields.CharField(max_length=255, null=True)
 	rating = fields.IntField(default=0)
-	vacancy: fields.ForeignKeyNullableRelation[Vacancies] = fields.ForeignKeyField(
-		"models.Vacancies", related_name="epv", null=True
-	)
-	cv_user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
-		"models.User", related_name="cv_user"
+	
+	user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
+		"models.User", related_name="user"
 	)
 	
+class Comment(Model):
+	id = fields.IntField(pk=True)
+	author = fields.CharField(max_length=255)
+	text = fields.TextField()
+	created_at = fields.DatetimeField(auto_now_add=True)
+	
+	experience: fields.ForeignKeyRelation[ExperienceVacancy] = fields.ForeignKeyField(
+		"models.ExperienceVacancy",
+		related_name="comments",
+	)
+
 class CVs(Model):
 	id = fields.IntField(pk=True)
 	user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
@@ -85,9 +107,11 @@ class CVs(Model):
 	vocation = fields.CharEnumField(VocationEnum)
 	subvocation = fields.CharField(max_length=255, null=True)
 	age_group = fields.IntEnumField(AgeGroupEnum)
+
 	experience: fields.ForeignKeyRelation[ExperienceVacancy] = fields.ForeignKeyField(
-		"models.ExperienceVacancy", related_name="ev"
+		"models.ExperienceVacancy", related_name="ev", on_delete=fields.CASCADE
 	)
+
 	min_salary = fields.IntField()
 	desired_salary = fields.IntField()
 	phone_number = fields.CharField(max_length=255)

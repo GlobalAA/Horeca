@@ -1,5 +1,6 @@
 from aiogram import Bot
 
+from keyboards import get_cvs_keyboard
 from src.models.models import CVs, User, Vacancies
 
 
@@ -41,15 +42,14 @@ async def cv_mailing(ctx):
 👨‍🦳 Вік: до {cv.age_group}
 ➖➖➖➖➖
 💡 Досвід роботи: {cv.experience.experience.value}
-💻 Минуле місце роботи: {cv.experience.name.capitalize()}
-{f"🤩 Оцінка: {'⭐️'* rating}" if rating > 0 else ''}
+💻 Минуле місце роботи: {cv.experience.name.capitalize() if cv.experience.name else 'Не вказано'}{f"\n🤩 Оцінка: {'⭐️'* rating}" if rating > 0 else ""}
 ➖➖➖➖➖
 📞 Телефон: {cv.phone_number}"""
 			
 			if cv.photo_id:
-				await bot.send_photo(cv.user.user_id, cv.photo_id, caption=text)
+				await bot.send_photo(cv.user.user_id, cv.photo_id, caption=text, reply_markup=await get_cvs_keyboard(cv.user.id, only_comments=True))
 			else:
-				await bot.send_message(cv.user.user_id, text=text)
+				await bot.send_message(cv.user.user_id, text=text, reply_markup=await get_cvs_keyboard(cv.user.id, only_comments=True))
 
 			cv.vacancies_ids.append(vacancy.id)
 			await cv.save()

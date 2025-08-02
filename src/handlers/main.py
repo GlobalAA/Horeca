@@ -51,7 +51,24 @@ async def cabinet(message: Message):
 
 	subscriptions: list[Subscriptions] = [sub for sub in user.subscriptions] #type: ignore
 	
-	text = text = get_cabinet_text(message, user, len_cv, len_published_cv, len_vacancies, subscriptions)
+	text = get_cabinet_text(message, user, len_cv, len_published_cv, len_vacancies, subscriptions)
 
 
 	await message.answer(text, reply_markup=cabinet_keyboard())
+
+@router.message(Command("info"))
+async def info(message: Message):
+	description = (
+    "Бот для пошуку роботи та співробітників.\n"
+    "Обирайте, кого шукаєте — вакансію чи працівника.\n\n"
+    "🟢 /start — розпочати пошук\n"
+    "👤 /cabinet — особистий кабінет\n"
+    "📩 Щогодини отримуйте нові вакансії або резюме!\n\n"
+    "💰 Тарифи:\n"
+    "• 1 оголошення на 1 день — 100 грн\n"
+    "• 1 оголошення на тиждень — 300 грн\n"
+    "• VIP-підписка на місяць (10 оголошень щотижня) — 2000 грн\n"
+    "• Підписка на резюме на місяць — 1000 грн\n"
+    "• Доступ до коментарів про кандидатів — 1000 грн/міс"
+)
+	await message.answer(description)

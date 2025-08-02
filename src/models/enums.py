@@ -2,6 +2,7 @@ from enum import Enum, IntEnum
 
 
 class UserRoleEnum(Enum):
+	ADMIN = "ADMIN"
 	EMPLOYER = "employer"
 	SEEKER = "seeker"
 	USER = "USER"
