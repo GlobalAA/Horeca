@@ -1,8 +1,17 @@
 from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from keyboards import get_cvs_keyboard
-from src.models.models import CVs, User, Vacancies
+from models.models import CVs
+from src.models.models import CVs, Vacancies
 
+
+async def get_cvs_keyboard() -> InlineKeyboardMarkup:
+	builder = InlineKeyboardBuilder()
+
+	builder.button(text="💬 Коментарі", callback_data="view_comments")
+	builder.adjust(1)
+	return builder.as_markup()
 
 async def cv_mailing(ctx):
 	vacancies = await Vacancies.filter(resume_sub=True).all()
@@ -47,9 +56,9 @@ async def cv_mailing(ctx):
 📞 Телефон: {cv.phone_number}"""
 			
 			if cv.photo_id:
-				await bot.send_photo(cv.user.user_id, cv.photo_id, caption=text, reply_markup=await get_cvs_keyboard(cv.user.id, only_comments=True))
+				await bot.send_photo(cv.user.user_id, cv.photo_id, caption=text, reply_markup=await get_cvs_keyboard())
 			else:
-				await bot.send_message(cv.user.user_id, text=text, reply_markup=await get_cvs_keyboard(cv.user.id, only_comments=True))
+				await bot.send_message(cv.user.user_id, text=text, reply_markup=await get_cvs_keyboard())
 
 			cv.vacancies_ids.append(vacancy.id)
 			await cv.save()
