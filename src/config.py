@@ -9,11 +9,11 @@ logger = logging.getLogger('scraper')
 ROOT_DIR = Path(__file__).parent.parent
 
 class PriceOptionConfig(BaseModel):
-	VIEW_COMMENTS: int
-	RESUME_SUB: int
-	VIP: int
-	ONE_WEEK: int
 	ONE_DAY: int
+	ONE_WEEK: int
+	RESUME_SUB: int
+	VIEW_COMMENTS: int
+	VIP: int
 
 class Redis(BaseModel):
 	username: str

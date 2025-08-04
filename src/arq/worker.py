@@ -1,3 +1,5 @@
+import logging
+
 from aiogram import Bot
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
@@ -8,7 +10,8 @@ from arq.connections import RedisSettings
 from arq.typing import WorkerSettingsBase
 from arq.worker import Function
 from src.config import config
-import logging
+
+from .functions.bonus import vacancy_bonus
 from .functions.mailing import cv_mailing, vacancy_mailing
 from .functions.time_expired import (check_user_time_expired,
                                      check_vacancy_time_expired)
@@ -74,6 +77,14 @@ class WorkerSettings(WorkerSettingsBase):
 			keep_result_s=0, 
 			keep_result_forever=False,
 			max_tries=1,
+		),
+		Function(
+			name="vacancy_bonus",
+			coroutine=vacancy_bonus,
+			timeout_s=10.0,
+			keep_result_s=0, 
+			keep_result_forever=False,
+			max_tries=1,
 		)
 	]
 	on_startup = startup
@@ -83,8 +94,9 @@ class WorkerSettings(WorkerSettingsBase):
 	cron_jobs = [
 		cron(check_user_time_expired, hour=8, minute=0, second=0, unique=True),
 		cron(check_vacancy_time_expired, hour=8, minute=3, second=0, unique=True),
-		cron(cv_mailing, hour=set(range(9, 24)), minute=0, second=0, unique=True),
-		cron(vacancy_mailing, hour=set(range(9, 24)), minute=0, second=0, unique=True)
+		cron(vacancy_bonus, hour=set(range(9, 24)), minute=0, second=0, unique=True),
+		cron(vacancy_mailing, hour=set(range(9, 24)), minute=0, second=0, unique=True),
+		cron(cv_mailing, minute=set(range(0, 60)), second=0, unique=True) 
 	]
 
 if __name__ == "__main__":

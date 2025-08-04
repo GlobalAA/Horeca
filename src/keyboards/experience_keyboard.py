@@ -21,7 +21,7 @@ def experience_type_keyboard(user_id: int) -> InlineKeyboardMarkup:
 	exp_type_text = {
 		ExperienceTypeEnum.NAME: "Вказати назву закладу",
 		ExperienceTypeEnum.VACANCY: "Вибрати заклад з бази",
-		ExperienceTypeEnum.SKIP: "⏫ Продовжити без минулого місця роботи"
+		ExperienceTypeEnum.SKIP: ""
 	}
 
 	for exp_type in ExperienceTypeEnum:

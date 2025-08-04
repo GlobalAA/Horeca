@@ -4,8 +4,10 @@ from .cabinet_keyboards import cabinet_keyboard
 from .city_district_keyboard import city_keyboard, district_keyboard
 from .communications_method_callback import communication_method_keyboard
 from .cv_keyboard import cv_keyboard, rating_cv_button, rating_cv_keyboard
+from .edit_keyboard import edit_keyboard
 from .experience_keyboard import experience_keyboard, experience_type_keyboard
 from .get_cvs_keyboard import get_cvs_keyboard
+from .last_name_keyboard import last_name_keyboard
 from .rate_type_keyboard import rate_type_keyboard
 from .reset_button import reset_keyboard
 from .start_keyboard import start_keyboard

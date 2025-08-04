@@ -17,7 +17,7 @@ class User(Model):
 	full_name = fields.CharField(max_length=255)
 	role = fields.CharEnumField(UserRoleEnum)
 	balance = fields.FloatField()
-	last_msg_id = fields.IntField(default=0)
+	last_vacancy_name = fields.CharField(max_length=255, null=True, default=None)
 	
 	on_week = fields.IntField(default=0)
 	created_at = fields.DatetimeField(auto_now_add=True)
@@ -58,9 +58,29 @@ class Vacancies(Model):
 	communications = fields.CharEnumField(CommunicationMethodEnum)
 	published = fields.BooleanField(default=False)
 	resume_sub = fields.BooleanField(default=False)
+	bonus = fields.BooleanField(default=False)
 	cvs_id = ArrayField("int", default={})
 	
 	time_expired = fields.DatetimeField(null=True)
+
+class CVs(Model):
+	id = fields.IntField(pk=True)
+	user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
+		"models.User", related_name="cvs"
+	)
+	city = fields.CharEnumField(CityEnum)
+	district = fields.CharField(max_length=255)
+	vocation = fields.CharEnumField(VocationEnum)
+	subvocation = fields.CharField(max_length=255, null=True)
+	age_group = fields.IntEnumField(AgeGroupEnum)
+
+	min_salary = fields.IntField()
+	desired_salary = fields.IntField()
+	phone_number = fields.CharField(max_length=255)
+	photo_id = fields.CharField(max_length=255, null=True)
+	published = fields.BooleanField(default=False)
+	vacancies_ids = ArrayField("int", default={})
+
 
 class ExperienceVacancy(Model):
 	id = fields.IntField(pk=True)
@@ -85,7 +105,9 @@ class ExperienceVacancy(Model):
 	user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
 		"models.User", related_name="user"
 	)
-	
+	cv: fields.ForeignKeyRelation[CVs] = fields.ForeignKeyField(
+		"models.CVs", related_name="cv", on_delete=fields.CASCADE
+	)
 class Comment(Model):
 	id = fields.IntField(pk=True)
 	author = fields.CharField(max_length=255)
@@ -95,26 +117,14 @@ class Comment(Model):
 	experience: fields.ForeignKeyRelation[ExperienceVacancy] = fields.ForeignKeyField(
 		"models.ExperienceVacancy",
 		related_name="comments",
+		on_delete=fields.CASCADE
 	)
-
-class CVs(Model):
+class UsefulInformation(Model):
 	id = fields.IntField(pk=True)
+	file_id = fields.CharField(max_length=255)
 	user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
-		"models.User", related_name="cvs"
-	)
-	city = fields.CharEnumField(CityEnum)
-	district = fields.CharField(max_length=255)
-	vocation = fields.CharEnumField(VocationEnum)
-	subvocation = fields.CharField(max_length=255, null=True)
-	age_group = fields.IntEnumField(AgeGroupEnum)
-
-	experience: fields.ForeignKeyRelation[ExperienceVacancy] = fields.ForeignKeyField(
-		"models.ExperienceVacancy", related_name="ev", on_delete=fields.CASCADE
+		"models.User", related_name="usefuli"
 	)
 
-	min_salary = fields.IntField()
-	desired_salary = fields.IntField()
-	phone_number = fields.CharField(max_length=255)
-	photo_id = fields.CharField(max_length=255, null=True)
-	published = fields.BooleanField(default=False)
-	vacancies_ids = ArrayField("int", default={})
+	class Meta(Model.Meta):
+		table = "Useful information"

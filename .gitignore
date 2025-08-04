@@ -3,3 +3,4 @@ migrations_old
 poetry.lock
 pyproject.toml
 __pycache__
+todo

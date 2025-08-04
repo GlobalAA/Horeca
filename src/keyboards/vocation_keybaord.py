@@ -23,10 +23,10 @@ def vocation_keyboard_price(balance: float, vip: bool, extend: bool = False, ind
 	builder = InlineKeyboardBuilder()
 
 	text_data = {
+		PriceOptionEnum.ONE_DAY: "📰 Розмістити оголошення на один день (50 грн)",
+		PriceOptionEnum.ONE_WEEK: "📰 Розмістити оголошення на тиждень (300 грн)",
 		PriceOptionEnum.RESUME_SUB: "📰 Підписатись на розсилку резюме",
 		PriceOptionEnum.VIP: "🍀 Розмістити за допомогою підписки",
-		PriceOptionEnum.ONE_WEEK: "📰 Розмістити оголошення на тиждень",
-		PriceOptionEnum.ONE_DAY: "📰 Розмістити оголошення на один день"
 	}
 
 	for name, value in config.price_options:

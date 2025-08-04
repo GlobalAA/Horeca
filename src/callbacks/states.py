@@ -42,3 +42,13 @@ class VocationSlider(StatesGroup):
 
 class CVComments(StatesGroup):
 	set_comment = State()
+
+class AdminInfoState(StatesGroup):
+	send_document = State()
+
+class EditCvState(StatesGroup):
+	choosing_phone_number = State()
+	choosing_vocation = State()
+	choosing_subvocation = State()
+	choosing_min_salary = State()
+	choosing_desired_salary = State()

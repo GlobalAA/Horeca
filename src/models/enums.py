@@ -95,6 +95,7 @@ class VocationEnum(Enum):
 
 class SubvocationEnum(Enum):
 	BARMAN = ("Бармен", 1)
+	BARBEK = ("Барбек", 1)
 	BARMAN_HOOKAH = ("Бармен-кальянник", 1)
 
 	MANAGER = ("Менеджер", 2)
@@ -106,8 +107,8 @@ class SubvocationEnum(Enum):
 	WAITER_HOOKAH = ("Офіціант-кальянник", 3)
 	WAITER_CASHIER = ("Офіціант-касир", 3)
 
+	COOK_HELPER = ("Помічник повара", 8)
 	COLD_KITCHEN = ("Кухар холодного цеху", 8)
-	HOT_KITCHEN_5 = ("Кухар гарячого цеху", 5)
 	HOT_KITCHEN_8 = ("Кухар гарячого цеху", 8)
 	UNIVERSAL_COOK = ("Кухар-універсал", 8)
 	SUSHI_CHEF = ("Сушист", 8)
@@ -130,3 +131,8 @@ class PriceOptionEnum(Enum):
 	VIP = "VIP"
 	VIEW_COMMENTS = "VIEW_COMMENTS"
 	RESUME_SUB = "RESUME SUB"
+
+class EditCvEnum(Enum):
+	VACATION = "VACATION"
+	SALARY = "SALARY"
+	PHONE_NUMBER = "PHONE_NUMBER"

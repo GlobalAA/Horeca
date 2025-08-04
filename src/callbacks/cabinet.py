@@ -8,7 +8,7 @@ from aiogram.types import CallbackQuery, Message
 from callbacks.types import (DeleteCv, ExtendPublicationData, MyCvData,
                              MyVocationData, UnPublishCv)
 from config import config
-from keyboards import get_cvs_keyboard
+from keyboards import edit_keyboard, get_cvs_keyboard
 from keyboards.vocation_keybaord import vocation_keyboard_price
 from models.enums import PriceOptionEnum
 from models.models import Comment, CVs, ExperienceVacancy, User, Vacancies
@@ -26,29 +26,50 @@ async def get_cvs(callback: CallbackQuery):
 	if not user:
 		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 
-	cv: CVs = await user.cvs.all().prefetch_related("experience").first() #type: ignore
+	cv: CVs = await user.cvs.all().first() #type: ignore
+	experiences = await ExperienceVacancy.filter(cv=cv).all()
 
 	if not cv:
 		return await callback.answer("У вас ще немає створених резюме")
 
 	message = cast(Message, callback.message)
 	
-	if cv.experience:
-		rating = cv.experience.rating
-	else:
-		rating = 0
+	ratings = {}
+	
+	for experience in experiences:
+		if experience.rating:
+			ratings[experience.name] = experience.rating
+		else:
+			ratings[experience.name] = 0
+
+	vocation = cv.vocation.value
+	subvocation = cv.subvocation
+
+	if subvocation and vocation:
+		vocation = subvocation
+
+	experience_blocks = []
+	for idx, experience in enumerate(experiences[:3], start=1):
+		name = experience.name.capitalize() if experience.name else "Не вказано"
+		rating = experience.rating or 0
+		stars = f"\n🤩 Оцінка: {'⭐️' * rating}" if rating > 0 else ""
+		
+		block = f"""➖➖➖➖➖
+💻 Минуле місце роботи ({idx}/3): {name}{stars}"""
+		experience_blocks.append(block)
+
+	experience_text = "\n".join(experience_blocks)
 
 	text = f"""{callback.from_user.full_name if not full_name else full_name}
 ➖➖➖➖➖
-♟ {cv.vocation.value}
+♟ {vocation}
 📍 Місто: {cv.city.value}
 🏠 Район: {cv.district}
 💰 Мінімальна з/п: {cv.min_salary}
 💵 Бажана з/п: {cv.desired_salary}
 👨‍🦳 Вік: до {cv.age_group}
-➖➖➖➖➖
-💡 Досвід роботи: {cv.experience.experience.value}
-💻 Минуле місце роботи: {cv.experience.name.capitalize() if cv.experience.name else 'Не вказано'}{f"\n🤩 Оцінка: {'⭐️'* rating}" if rating > 0 else ""}
+💡 Досвід роботи: {experiences[0].experience.value}
+{experience_text}
 ➖➖➖➖➖
 📞 Телефон: {cv.phone_number}"""
 	
@@ -136,11 +157,11 @@ async def extend_publication(callback: CallbackQuery, state: FSMContext):
 
 	bad_balance = get_min_price() > user.balance
 
-	if bad_balance or not PriceOptionEnum.VIP in subscriptions:
+	if bad_balance:
 		callback.answer()
 		return await callback.message.answer("🔴 На жаль, на вашому балансі недостатньо коштів. Поповніть баланс для створення вакансій!")
 
-	if user.on_week <= 0 and bad_balance:
+	if user.on_week <= 0 and bad_balance and PriceOptionEnum.VIP in subscriptions:
 		callback.answer()
 		return await callback.message.answer("🔴 Ви вже витратили усі свої можливості на створення вакансій. Чекайте оновлення наступного місяця")
 
@@ -167,9 +188,6 @@ async def extend_publication_next(callback: CallbackQuery, callback_data: Extend
 	
 	data = await state.get_data()
 	index = data['index']
-	
-	if index == 0:
-		index = 1
 
 	vacancies: list[Vacancies] = await user.vacancies.all() #type: ignore
 	vacancy = vacancies[index]
@@ -237,9 +255,15 @@ async def view_comments(callback: CallbackQuery, state: FSMContext):
 	if not user:
 		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 
-	cv: CVs = await user.cvs.all().first().prefetch_related("experience__comments") #type: ignore
-	comments: list[Comment] = await cv.experience.comments.all() #type: ignore
-	
+	cv: CVs = await user.cvs.all().first() #type: ignore
+	experiences = await ExperienceVacancy.filter(cv=cv).all()
+	comments: list[Comment] = []
+
+	for experience in experiences:
+		comments_exp: list[Comment] = await experience.comments.all() #type: ignore
+		for comment in comments_exp:
+			comments.append(comment) 
+
 	if len(comments) <= 0:
 		return await message.answer("До вашої вакансії коментарів не знайдено")
 	
@@ -252,3 +276,16 @@ async def view_comments(callback: CallbackQuery, state: FSMContext):
 Опубліковано {comment.created_at.strftime("%d.%m.%Y")}
 """
 	await message.answer(text, reply_markup=await comment_slider_button(0, len(comments)))
+
+@cabinet_router.callback_query(F.data == "edit_cv")
+async def edit_cv_callback(callback: CallbackQuery):
+	await callback.answer()
+	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("cvs")
+
+	if not user:
+		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
+	
+	cv: CVs = await user.cvs.all().first() #type: ignore
+	message = cast(Message, callback.message)
+
+	await message.answer("Виберіть, що саме хочете змінити", reply_markup=edit_keyboard(cv.id))

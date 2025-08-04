@@ -13,10 +13,11 @@ from callbacks.types import (AgeGroupData, BackData, CityData,
                              CommunicationMethodData, DistrictData,
                              ExperienceData, FinalDataVocation, ImageData,
                              RateTypeData, ResetData, SubvocationData,
-                             VocationData)
+                             VacancyNameSkip, VocationData)
 from keyboards import (age_group_keyboard, append_back_button, city_keyboard,
                        communication_method_keyboard, district_keyboard,
-                       experience_keyboard, rate_type_keyboard, reset_keyboard,
+                       experience_keyboard, last_name_keyboard,
+                       rate_type_keyboard, reset_keyboard,
                        subvocation_keyboard, vocation_keyboard,
                        vocation_keyboard_price)
 from models.enums import (CommunicationMethodEnum, PriceOptionEnum,
@@ -43,7 +44,7 @@ async def reset_handler(callback: CallbackQuery, state: FSMContext):
 	await callback.answer()
 	await push_state(state, VocationState.choosing_city)
 
-@router_employer.callback_query(BackData.filter(F.type == UserRoleEnum.EMPLOYER))
+@router_employer.callback_query(BackData.filter(F.type == UserRoleEnum.EMPLOYER), BackData.filter(F.edit == False))
 async def back_handler(callback: CallbackQuery, state: FSMContext):
 	data = await state.get_data()
 	history: list[str] = data.get("history", [])
@@ -69,9 +70,9 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
     "choosing_district": "Оберіть район",
     "choosing_vocation": "Виберіть сферу діяльності",
     "choosing_subvocation": "Виберіть підвакансію",
-    "choosing_name": "Вкажіть назву закладу",
+    "choosing_name": "Вкажіть назву закладу\n\nПишіть правильно, щоб в подальшому облегшити пошук",
     "choosing_address": "Вкажіть адресу закладу",
-    "choosing_work_schedule": "Вкажіть графік роботи",
+    "choosing_work_schedule": "Вкажіть графік роботи\n\nПриклад: з 11:00 до 22:00 і 2/2 або 2/4",
     "choosing_age_group": "Оберіть вікову групу",
     "choosing_experience": "Вкажіть досвід роботи",
     "choosing_salary": "Вкажіть заробітну плату",
@@ -155,7 +156,7 @@ async def choosing_vocation_callback(callback: CallbackQuery, callback_data: Voc
 	message = cast(Message, callback.message)
 	
 	if callback_data.vocation in (VocationEnum.HOSTESS, VocationEnum.CASHIER, VocationEnum.PURCHASER, VocationEnum.CLEANER, VocationEnum.SECURITY, VocationEnum.ACCOUNTANT, VocationEnum.HOOKAH):
-		await message.answer("Вкажіть назву закладу", reply_markup=append_back_button(None, "choosing_name", UserRoleEnum.EMPLOYER))
+		await message.answer("Вкажіть назву закладу\n\nПишіть правильно, щоб в подальшому облегшити пошук", reply_markup=append_back_button(await last_name_keyboard(user_id=callback.from_user.id), "choosing_name", UserRoleEnum.EMPLOYER))
 
 		await callback.answer()
 		return await push_state(state, VocationState.choosing_name)
@@ -174,7 +175,7 @@ async def choosing_subvocation_callback(callback: CallbackQuery, callback_data: 
 
 	message = cast(Message, callback.message)
 	
-	await message.edit_text("Вкажіть назву закладу", reply_markup=append_back_button(None, "choosing_subvocation", UserRoleEnum.EMPLOYER)) 
+	await message.edit_text("Вкажіть назву закладу\n\nПишіть правильно, щоб в подальшому облегшити пошук", reply_markup=append_back_button(await last_name_keyboard(user_id=callback.from_user.id), "choosing_subvocation", UserRoleEnum.EMPLOYER)) 
 
 	await callback.answer()
 	await push_state(state, VocationState.choosing_name)
@@ -186,11 +187,21 @@ async def choosing_name(message: Message, state: FSMContext):
 	await message.answer("Вкажіть адресу закладу", reply_markup=append_back_button(None, "choosing_name", UserRoleEnum.EMPLOYER))
 	await push_state(state, VocationState.choosing_address)
 
+@router_employer.callback_query(VocationState.choosing_name, VacancyNameSkip.filter())
+async def choosing_name_callback(callback: CallbackQuery, callback_data: VacancyNameSkip, state: FSMContext):
+	message = cast(Message, callback.message)
+	await state.update_data(name=callback_data.last_name)
+
+	await message.edit_text(text="Вибрано останню назву закладу")
+
+	await message.answer("Вкажіть адресу закладу", reply_markup=append_back_button(None, "choosing_name", UserRoleEnum.EMPLOYER))
+	await push_state(state, VocationState.choosing_address)
+
 @router_employer.message(VocationState.choosing_address)
 async def choosing_address(message: Message, state: FSMContext):
 	await state.update_data(address=message.text)
 	
-	await message.answer("Вкажіть графік роботи", reply_markup=append_back_button(None, "choosing_address", UserRoleEnum.EMPLOYER))  
+	await message.answer("Вкажіть графік роботи\n\nПриклад: з 11:00 до 22:00 і 2/2 або 2/4", reply_markup=append_back_button(None, "choosing_address", UserRoleEnum.EMPLOYER))  
 
 	await push_state(state, VocationState.choosing_work_schedule)
 
@@ -483,7 +494,9 @@ async def vocation_final_state(callback: CallbackQuery, callback_data: FinalData
 		published=callback_data.published,
 		resume_sub=data.get('resume_sub', False),
 		time_expired=datetime.now() + delta
-	)
+	)	
+
+	user.last_vacancy_name = data['name']	
 
 	await new_vocation.save()
 	await user.save()

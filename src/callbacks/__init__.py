@@ -2,7 +2,7 @@ from aiogram import Router
 
 from .cabinet import cabinet_router
 from .main import router as main_router
-from .profile import router_employer, router_seeker
+from .profile import edit_router, router_employer, router_seeker
 
 
 def setup_callbacks() -> Router:
@@ -12,7 +12,8 @@ def setup_callbacks() -> Router:
 		main_router,
 		router_employer,
 		router_seeker,
-		cabinet_router
+		cabinet_router,
+		edit_router
 	)
 
 	return router

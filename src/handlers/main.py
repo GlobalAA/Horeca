@@ -4,7 +4,8 @@ from aiogram.types import Message
 
 from keyboards import start_keyboard
 from keyboards.cabinet_keyboards import cabinet_keyboard
-from models.models import PriceOptionEnum, Subscriptions, User, UserRoleEnum
+from models.models import (PriceOptionEnum, Subscriptions, UsefulInformation,
+                           User, UserRoleEnum)
 from utils.cabinet_text import get_cabinet_text
 
 router = Router()
@@ -58,6 +59,16 @@ async def cabinet(message: Message):
 
 @router.message(Command("info"))
 async def info(message: Message):
+	user = await User.get_or_none(user_id=message.from_user.id).prefetch_related("vacancies")
+	if not user:
+		return await message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
+	
+	with_file = len(user.vacancies) > 0 #type: ignore
+	info_file = None
+
+	if with_file:
+		info_file = await UsefulInformation.first()
+
 	description = (
     "Бот для пошуку роботи та співробітників.\n"
     "Обирайте, кого шукаєте — вакансію чи працівника.\n\n"
@@ -71,4 +82,7 @@ async def info(message: Message):
     "• Підписка на резюме на місяць — 1000 грн\n"
     "• Доступ до коментарів про кандидатів — 1000 грн/міс"
 )
+	if with_file and info_file:
+		return await message.answer_document(info_file.file_id, caption=description)
+	
 	await message.answer(description)

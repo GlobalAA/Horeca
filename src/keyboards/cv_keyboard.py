@@ -7,10 +7,9 @@ from callbacks.types import CommentData, FinalDataCv, RatingCvData
 def cv_keyboard() -> InlineKeyboardMarkup:
 	builder = InlineKeyboardBuilder()
 
-	builder.button(text="📰 Опублікувати і підписатись", callback_data=FinalDataCv(published=True).pack())
-	builder.button(text="🔍 Тільки підписатись", callback_data=FinalDataCv(published=False).pack())
+	builder.button(text="📰 Опублікувати", callback_data=FinalDataCv(published=True).pack())
 	
-	builder.adjust(2)
+	builder.adjust(1)
 
 	return builder.as_markup()
 

@@ -4,10 +4,10 @@ from callbacks.types import BackData
 from models.enums import UserRoleEnum
 
 
-def append_back_button(markup: InlineKeyboardMarkup | None, to_state: str, role: UserRoleEnum = UserRoleEnum.SEEKER) -> InlineKeyboardMarkup:
+def append_back_button(markup: InlineKeyboardMarkup | None, to_state: str, role: UserRoleEnum = UserRoleEnum.SEEKER, edit: bool = False) -> InlineKeyboardMarkup:
 	back_button = InlineKeyboardButton(
 		text="🔙 Повернутись",
-		callback_data=BackData(to_state=to_state, type=role).pack()
+		callback_data=BackData(to_state=to_state, type=role, edit=edit).pack()
 	)
 
 	if markup is None:

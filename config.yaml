@@ -9,7 +9,7 @@ price_options:
   VIEW_COMMENTS: 1000
 
 redis:
-  host: 'switchyard.proxy.rlwy.net'
-  port: 58560
+  host: 'caboose.proxy.rlwy.net'
+  port: 40339
   username: 'default'
-  password: 'SbDoQqMjdYeQItvJcXVrOhqiYgdjLTsG'
+  password: 'KMLpXfMwOjwOJqOCrUOQkxekcCgJLdhw'

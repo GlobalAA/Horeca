@@ -11,6 +11,7 @@ async def get_cvs_keyboard(user_id: int) -> InlineKeyboardMarkup:
 
 	builder = InlineKeyboardBuilder()
 
+	builder.button(text="📝 Редагувати", callback_data="edit_cv")
 	builder.button(text=f"🍀 {"Зняти з публікації" if cv.published else "Опублікувати"}", callback_data=UnPublishCv(action="unpublish" if cv.published else "publish"))
 	builder.button(text="🗑 Видалити", callback_data=DeleteCv(action="delete_cv"))
 	builder.button(text="💬 Коментарі", callback_data="view_comments")

@@ -115,10 +115,11 @@ async def slider_navigate(callback: CallbackQuery, state: FSMContext):
 		if data_vac:
 			vacancies.append(data_vac)
 
-	for v in data['experience_vacancies']:
-		data_experience_vacancies = await ExperienceVacancy.get_or_none(id=int(v))
-		if data_experience_vacancies != None:
-			vacancies.append(data_experience_vacancies)
+	if data.get('experience_vacancies', None) != None:
+		for v in data['experience_vacancies']:
+			data_experience_vacancies = await ExperienceVacancy.get_or_none(id=int(v))
+			if data_experience_vacancies != None:
+				vacancies.append(data_experience_vacancies)
 
 	current_vacancy: Vacancies | ExperienceVacancy = vacancies[index]
 
@@ -152,7 +153,7 @@ async def rating_callback(callback: CallbackQuery, callback_data: RatingCvData):
 
 	if not experience:
 		await callback.answer()
-		return await message.answer("🔴 Сталася помилка, зверніться до адміністратора")
+		return await message.reply("🔴 Сталася помилка, скоріше за все, користувач вже видалив резюме")
 	
 	await callback.answer()
 	await message.reply("⭐️ Оцініть роботу колишнього робітника", reply_markup=rating_cv_keyboard(callback_data.exp_id))
@@ -182,6 +183,11 @@ async def rating_set_callback(callback: CallbackQuery, callback_data: RatingCvDa
 @router.callback_query(CommentData.filter(), StateFilter(None))
 async def comment(callback: CallbackQuery, callback_data: CommentData, state: FSMContext):
 	message = cast(Message, callback.message)
+
+	experience = await ExperienceVacancy.filter(id=callback_data.exp_id).first()
+
+	if not experience:
+		return await message.reply("🔴 Сталася помилка, скоріше за все, користувач вже видалив резюме")
 
 	await state.update_data(exp_id=callback_data.exp_id)
 
