@@ -58,7 +58,6 @@ async def save_experience_and_continue(state: FSMContext, vacancy: Vacancies | N
 		await message.answer(f"Опишіть {index + 1}-е місце роботи", reply_markup=experience_type_keyboard(id))
 		await push_state(state, CVState.choosing_experience_type)
 	else:
-		print(1)
 		await message.answer("Вкажіть мінімальну зарплату в місяць", reply_markup=append_back_button(None, "choosing_experience_type"))
 
 		return await push_state(state, CVState.choosing_min_salary)
@@ -265,27 +264,37 @@ async def choosing_experience_type_callback(callback: CallbackQuery, callback_da
 	message = cast(Message, callback.message)
 
 	filters = {
-			'city': data['city'],
-			'vocation': data['vocation'],
-			'age_group': data['age_group'],
-			'experience': data['experience']
+		'city': data['city'],
+		'vocation': data['vocation'],
+		'age_group': data['age_group'],
+		'experience': data['experience']
 	}
+
+	district = data.get('district', None)
+
 	if data.get('subvocation'):
-			filters['subvocation'] = data['subvocation']
-	if data.get('district') and data['district'] != DistrictEnum.ALL:
-			filters['district'] = data['district']
+		filters['subvocation'] = data['subvocation']
+
+	if district and data['district'] != DistrictEnum.ALL.value[0]:
+		filters['district'] = data['district']
 
 	vacancies = await Vacancies.filter(**filters).all()
 	exp_vacancies = await get_exactly_experience_vacancy(filters)
 
 	if callback_data.experience_type == ExperienceTypeEnum.SKIP:
-		return
+		await callback.answer()
 
-	if callback_data.experience_type == ExperienceTypeEnum.NAME or (not vacancies and not exp_vacancies):
-		if not vacancies and not exp_vacancies:
-			await message.edit_text("Не знайдено вакансій")
-			await message.answer("Вкажіть назву місця роботи", reply_markup=append_back_button(None, "choosing_experience_name"))
-			return await push_state(state, CVState.choosing_experience_name)
+		await message.reply("Продовжуємо без досвіду")
+		await message.answer("Вкажіть мінімальну зарплату в місяць", reply_markup=append_back_button(None, "choosing_experience_type"))
+
+		return await push_state(state, CVState.choosing_min_salary)
+
+	if not vacancies and not exp_vacancies:
+		await message.edit_text("Не знайдено вакансій")
+		await message.answer("Вкажіть назву місця роботи", reply_markup=append_back_button(None, "choosing_experience_name"))
+		return await push_state(state, CVState.choosing_experience_name)
+	
+	if callback_data.experience_type == ExperienceTypeEnum.NAME:
 		
 		await message.edit_text("Вкажіть назву місця роботи", reply_markup=append_back_button(None, "choosing_experience_name"))
 		return await push_state(state, CVState.choosing_experience_name)
@@ -475,6 +484,7 @@ async def cv_final_state(callback: CallbackQuery, callback_data: FinalDataCv, st
 			vocation=data["vocation"],
 			subvocation=data.get("subvocation"),
 			age_group=age_group,
+			experience_enum=data['experience'],
 			min_salary=int(data["min_salary"]),
 			desired_salary=int(data["desired_salary"]),
 			phone_number=data["phone_number"],
@@ -517,7 +527,6 @@ async def cv_final_state(callback: CallbackQuery, callback_data: FinalDataCv, st
 					return await message.answer("🔴 Сталася помилка, даних про підписку не знайдено, зверніться до адміністратора!")
 
 			exp_vac = ExperienceVacancy(
-				experience=data['experience'],
 				name=exp_name,
 				user=user,
 				cv=new_cv

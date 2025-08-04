@@ -62,7 +62,7 @@ def send_vocation(full_name: str, vocations: list[Vacancies | ExperienceVacancy]
 💰 Заробітна плата: {int(vocation_model.salary)} | Ставка: {vocation_model.rate}
 📆 Видається з/п: {vocation_model.issuance_salary}
 👨‍🦳 Вік: до {vocation_model.age_group}
-💡 Досвід роботи: {vocation_model.experience.value}
+💡 Досвід роботи: {vocation_model.experience.value if isinstance(vocation_model, Vacancies) else 'Не вказано'}
 📞 Для зв'язку: {communication_text} | {full_name}
 📩 Спосіб зв'язку: {vocation_model.communications.value}"""
 	

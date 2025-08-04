@@ -68,6 +68,7 @@ class CVs(Model):
 	user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
 		"models.User", related_name="cvs"
 	)
+	experience_enum = fields.CharEnumField(ExperienceEnum, null=True)
 	city = fields.CharEnumField(CityEnum)
 	district = fields.CharField(max_length=255)
 	vocation = fields.CharEnumField(VocationEnum)
@@ -85,7 +86,6 @@ class CVs(Model):
 class ExperienceVacancy(Model):
 	id = fields.IntField(pk=True)
 	
-	experience = fields.CharEnumField(ExperienceEnum)
 	name = fields.CharField(max_length=255, null=True)
 	city = fields.CharEnumField(CityEnum, null=True)
 	district = fields.CharField(max_length=255, null=True)

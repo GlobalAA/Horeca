@@ -68,8 +68,7 @@ async def get_cvs(callback: CallbackQuery):
 💰 Мінімальна з/п: {cv.min_salary}
 💵 Бажана з/п: {cv.desired_salary}
 👨‍🦳 Вік: до {cv.age_group}
-💡 Досвід роботи: {experiences[0].experience.value}
-{experience_text}
+💡 Досвід роботи: {cv.experience_enum.value}{f"\n{experience_text}" if len(experience_blocks) > 0 else experience_text}
 ➖➖➖➖➖
 📞 Телефон: {cv.phone_number}"""
 	
@@ -134,7 +133,7 @@ async def vocation_get(callback: CallbackQuery, state: FSMContext):
 	await state.update_data(vacancies=[v.id for v in vacancies], index=0)
 
 	message = cast(Message, callback.message)
-	text, markup = send_vocation(callback.from_user.full_name, vacancies, 0, len(vacancies))
+	text, markup = send_vocation(user.full_name, vacancies, 0, len(vacancies))
 
 	if vacancy.photo_id:
 		return await message.answer_photo(vacancy.photo_id, caption=text, reply_markup=markup)

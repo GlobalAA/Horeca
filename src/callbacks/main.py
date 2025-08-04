@@ -138,7 +138,7 @@ async def slider_navigate(callback: CallbackQuery, state: FSMContext):
 
 	await state.update_data(index=index)
 	await message.delete()
-	text, markup = send_vocation(callback.from_user.full_name, vacancies, index, len(vacancies), view_all)
+	text, markup = send_vocation(user.full_name, vacancies, index, len(vacancies), view_all)
 
 	if current_vacancy.photo_id:
 		return await message.answer_photo(current_vacancy.photo_id, caption=text, reply_markup=markup)

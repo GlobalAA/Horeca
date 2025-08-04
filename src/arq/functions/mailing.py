@@ -78,8 +78,7 @@ async def cv_mailing(ctx):
 💰 Мінімальна з/п: {cv.min_salary}
 💵 Бажана з/п: {cv.desired_salary}
 👨‍🦳 Вік: до {cv.age_group}
-💡 Досвід роботи: {experiences[0].experience.value}
-{experience_text}
+💡 Досвід роботи: {cv.experience_enum.value}{f"\n{experience_text}" if len(experience_blocks) > 0 else experience_text}
 ➖➖➖➖➖
 📞 Телефон: {cv.phone_number}"""
 				

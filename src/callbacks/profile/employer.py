@@ -75,7 +75,7 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
     "choosing_work_schedule": "Вкажіть графік роботи\n\nПриклад: з 11:00 до 22:00 і 2/2 або 2/4",
     "choosing_age_group": "Оберіть вікову групу",
     "choosing_experience": "Вкажіть досвід роботи",
-    "choosing_salary": "Вкажіть заробітну плату",
+    "choosing_salary": "Вкажіть заробітну плату в місяць",
     "choosing_rate_type": "Виберіть тип ставки в день",
     "choosing_rate": "Введіть ставку",
     "choosing_issuance_salary": "Вкажіть формати видачі заробітної плати\n\nПриклад: раз в місяць, раз в день",
@@ -237,7 +237,7 @@ async def choosing_experience(callback: CallbackQuery, callback_data: Experience
 
 	message = cast(Message, callback.message)
 
-	await message.edit_text("Вкажіть заробітну плату", reply_markup=append_back_button(None, "choosing_experience", UserRoleEnum.EMPLOYER))
+	await message.edit_text("Вкажіть заробітну плату в місяць", reply_markup=append_back_button(None, "choosing_experience", UserRoleEnum.EMPLOYER))
 
 	await callback.answer()
 	await push_state(state, VocationState.choosing_salary)
