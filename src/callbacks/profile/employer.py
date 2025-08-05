@@ -30,19 +30,42 @@ from utils.validate import percent_validate, validate_telegram_username
 router_employer = Router()
 
 @router_employer.callback_query(ResetData.filter(F.type == UserRoleEnum.EMPLOYER))
-async def reset_handler(callback: CallbackQuery, state: FSMContext):
-	await state.clear()
-	
+async def reset_handler(callback: CallbackQuery, callback_data: ResetData, state: FSMContext):	
 	message = cast(Message, callback.message)
 
 	try:
-		await message.edit_text("🔄 Починаємо спочатку")
+		if callback_data.for_update:
+			await message.reply("🔄 Починаємо заповнення спочатку")
+		else:
+			await message.edit_text("🔄 Починаємо спочатку")
 	except TelegramBadRequest:
 		await message.answer("🔄 Починаємо спочатку")
-		
+	
+	data = await state.get_data()
+
+	update_exist = data.get('update', False)
+
+	if callback_data.for_update:
+		await state.clear()
+
+		if not update_exist:
+			vacancies: list[int] = sorted(data.get('vacancies', []))
+			index: int = data.get('index', 0)
+
+			vacancy_id = vacancies[index]
+
+			await state.update_data(update=True, update_id=vacancy_id)
+		else:
+			update_id = data.get('update_id', None)
+			await state.update_data(update=update_exist, update_id=update_id)
+	else:
+		await state.clear()
+
 	await message.answer('Оберіть місто', reply_markup=city_keyboard(callback.from_user.id))
 	await callback.answer()
+
 	await push_state(state, VocationState.choosing_city)
+
 
 @router_employer.callback_query(BackData.filter(F.type == UserRoleEnum.EMPLOYER), BackData.filter(F.edit == False))
 async def back_handler(callback: CallbackQuery, state: FSMContext):
@@ -50,7 +73,6 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 	history: list[str] = data.get("history", [])
 
 	if len(history) <= 1:
-		print(history)
 		return await callback.answer("🔴 Немає куди повертатись")
 
 	history.pop()
@@ -59,7 +81,6 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 
 	target_state = getattr(VocationState, state_name, None)
 	if not target_state:
-		print(target_state, state_name)
 		return await callback.answer("🔴 Неможливо повернутись назад")
 
 	await state.update_data(history=history)
@@ -123,6 +144,7 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
 
 @router_employer.callback_query(VocationState.choosing_city, CityData.filter())
 async def choosing_city(callback: CallbackQuery, callback_data: CityData, state: FSMContext):
+	print(await state.get_data())
 	await state.update_data(city=callback_data.city)
 
 	message = cast(Message, callback.message)
@@ -291,9 +313,40 @@ async def choosing_issuance_salary(message: Message, state: FSMContext):
 
 	await state.update_data(issuance_salary=issuance_salary)
 
+	builder = InlineKeyboardBuilder()
+
+	builder.button(
+		text="⏫ Продовжити без інформації",
+		callback_data="skip_information"
+	)
+
+	await message.answer(
+		"Ви хочете додати додаткову інформацію про вакансію?", 
+		reply_markup=append_back_button(builder.as_markup(), "choosing_issuance_salary", UserRoleEnum.EMPLOYER)
+	)
+
+	await push_state(state, VocationState.choosing_additional_information)
+
+@router_employer.message(VocationState.choosing_additional_information)
+async def choosing_additional_information(message: Message, state: FSMContext):
+	additional_information = message.text
+
+	await state.update_data(additional_information=additional_information)
+
 	await message.answer(
 		"Виберіть метод комунікації", 
-		reply_markup=append_back_button(communication_method_keyboard(message.from_user.id), "choosing_issuance_salary", UserRoleEnum.EMPLOYER)
+		reply_markup=append_back_button(communication_method_keyboard(message.from_user.id), "choosing_additional_information", UserRoleEnum.EMPLOYER)
+	)
+
+	await push_state(state, VocationState.choosing_communications)
+
+@router_employer.callback_query(VocationState.choosing_additional_information, F.data == "skip_information")
+async def choosing_additional_information_skip(callback: CallbackQuery, state: FSMContext):
+	message = cast(Message, callback.message)
+	await callback.answer()
+	await message.edit_text(
+		"Виберіть метод комунікації", 
+		reply_markup=append_back_button(communication_method_keyboard(message.from_user.id), "choosing_additional_information", UserRoleEnum.EMPLOYER)
 	)
 
 	await push_state(state, VocationState.choosing_communications)
@@ -389,27 +442,30 @@ async def data_full_get(message: Message, state: FSMContext, user_id: int, photo
 
 	full_data = f"""Заклад <i>{data['name']}</i>
 ➖➖➖➖➖
+♟ Шукає {vocation}
 📍 Місто: {data["city"].value}
 🏠 Район: {data['district']}
-♟ {vocation}
 ⏱️ Графік роботи: {data['work_schedule']}
 💰 Заробітна плата: {int(data['salary'])} | Ставка: {data['rate']}
 📆 Видається з/п: {data['issuance_salary']}
 👨‍🦳 Вік: до {data['age_group']}
 💡 Досвід роботи: {data['experience'].value}
+📰 Додаткова інформація: {data['additional_information'] if data.get('additional_information', None) else "Не вказано"}
 📞 Для зв'язку: {communication_text} | {full_name}
 📩 Спосіб зв'язку: {data['communication_data'].value}"""
 
-	reset_keyboard_inline = reset_keyboard(role=UserRoleEnum.EMPLOYER).inline_keyboard
+	update = data.get('update', False)
+	reset_keyboard_inline = reset_keyboard(role=UserRoleEnum.EMPLOYER, for_update=update).inline_keyboard
 
 	subscriptions: list[PriceOptionEnum] = [sub.status for sub in user.subscriptions] # type: ignore
+
 
 	is_vip = PriceOptionEnum.VIP in subscriptions
 
 	if is_vip and user.on_week <= 0:
 		is_vip = False
 
-	vocation_final_reset = vocation_keyboard_price(balance=user.balance, vip=is_vip).inline_keyboard + reset_keyboard_inline
+	vocation_final_reset = vocation_keyboard_price(balance=user.balance, vip=is_vip, update=update).inline_keyboard + reset_keyboard_inline
 
 	vocation_final_reset_markup = InlineKeyboardMarkup(inline_keyboard=vocation_final_reset)
 
@@ -430,76 +486,116 @@ async def vocation_final_state(callback: CallbackQuery, callback_data: FinalData
 	
 	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("subscriptions")
 
+	update = data.get('update', False)
+	vacancy_id = data.get('update_id', None)
+
 	message = cast(Message, callback.message)
 
 	if not user:
 		await callback.answer()
 		return await message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 
-	subscriptions: list[PriceOptionEnum] = [sub.status for sub in user.subscriptions] # type: ignore
+	if not update and not vacancy_id:
+		subscriptions: list[PriceOptionEnum] = [sub.status for sub in user.subscriptions] # type: ignore
 
-	is_vip = PriceOptionEnum.VIP in subscriptions and callback_data.price_option == PriceOptionEnum.VIP
+		is_vip = PriceOptionEnum.VIP in subscriptions and callback_data.price_option == PriceOptionEnum.VIP
 
-	resume_sub_in_subscriptions = PriceOptionEnum.RESUME_SUB in subscriptions
+		resume_sub_in_subscriptions = PriceOptionEnum.RESUME_SUB in subscriptions
 
-	if is_vip:
-		if user.on_week > 0:
-			user.on_week -= 1
+		if is_vip:
+			if user.on_week > 0:
+				user.on_week -= 1
+			else:
+				await callback.answer()
+				return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
+		elif callback_data.price_option == PriceOptionEnum.RESUME_SUB:
+			if resume_sub_in_subscriptions:
+				data['resume_sub'] = True
+			else:
+				await callback.answer()
+				return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
 		else:
-			await callback.answer()
-			return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
-	elif callback_data.price_option == PriceOptionEnum.RESUME_SUB:
-		if resume_sub_in_subscriptions:
-			data['resume_sub'] = True
-		else:
-			await callback.answer()
-			return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
+			if user.balance <  callback_data.price:
+				await callback.answer()
+				return await message.answer("🔴 На вашому балансі недостатньо коштів для здійснення операції")
+			user.balance -= int(callback_data.price)
+
+		await state.clear()
+
+		delta = timedelta()
+
+		if callback_data.price_option in [PriceOptionEnum.VIP, PriceOptionEnum.ONE_WEEK]:
+			delta = timedelta(weeks=1) 
+		if callback_data.price_option == PriceOptionEnum.ONE_DAY:
+			delta = timedelta(days=1) 
+		if callback_data.price_option == PriceOptionEnum.RESUME_SUB:
+			delta = timedelta(weeks=4)
+		
+
+		new_vocation = Vacancies(
+			city=data['city'],
+			district=data['district'],
+			address = data['address'],
+			name=data['name'],
+			work_schedule=data['work_schedule'],
+			issuance_salary=data['issuance_salary'],
+			vocation=data['vocation'],
+			subvocation=data.get('subvocation', None),
+			age_group=data['age_group'],
+			experience=data['experience'],
+			salary=int(data['salary']),
+			rate=data['rate'],
+			rate_type=data['rate_type'],
+			additional_information=data.get('additional_information', None),
+			phone_number=data.get('phone_number', None),
+			telegram_link=data.get('telegram_link', None),
+			photo_id=data['photo_id'],
+			communications=data['communication_data'],
+			user=user,
+			published=callback_data.published,
+			resume_sub=data.get('resume_sub', False),
+			time_expired=datetime.now() + delta
+		)	
+
+		user.last_vacancy_name = data['name']	
+
+		await new_vocation.save()
+		await user.save()
+
+		await callback.answer()
+		await message.reply(f"🟢 Вакансія збережена!")
+
 	else:
-		if user.balance <  callback_data.price:
-			await callback.answer()
-			return await message.answer("🔴 На вашому балансі недостатньо коштів для здійснення операції")
-		user.balance -= int(callback_data.price)
+		vacancy = await Vacancies.get_or_none(id=vacancy_id, user=user)
 
-	await state.clear()
+		if not vacancy:
+			return await callback.answer("🔴 Вакансію не знайдено")
 
-	delta = timedelta()
+		vacancy.city = data['city']
+		vacancy.district = data['district']
+		vacancy.address = data['address']
+		vacancy.name = data['name']
+		vacancy.work_schedule = data['work_schedule']
+		vacancy.issuance_salary = data['issuance_salary']
+		vacancy.vocation = data['vocation']
+		vacancy.subvocation = data.get('subvocation', None)
+		vacancy.age_group = data['age_group']
+		vacancy.experience = data['experience']
+		vacancy.salary = int(data['salary'])
+		vacancy.rate = data['rate']
+		vacancy.rate_type = data['rate_type']
+		vacancy.additional_information = data.get('additional_information', None)
+		vacancy.phone_number = data.get('phone_number', None)
+		vacancy.telegram_link = data.get('telegram_link', None)
+		vacancy.photo_id = data['photo_id']
+		vacancy.communications = data['communication_data']
+		vacancy.published = vacancy.published
+		vacancy.resume_sub = data.get('resume_sub', False)
 
-	if callback_data.price_option in [PriceOptionEnum.VIP, PriceOptionEnum.ONE_WEEK]:
-		delta = timedelta(weeks=1) 
-	if callback_data.price_option == PriceOptionEnum.ONE_DAY:
-		delta = timedelta(days=1) 
-	if callback_data.price_option == PriceOptionEnum.RESUME_SUB:
-		delta = timedelta(weeks=4)
-	
+		user.last_vacancy_name = data['name']	
 
-	new_vocation = Vacancies(
-		city=data['city'],
-		district=data['district'],
-		address = data['address'],
-		name=data['name'],
-		work_schedule=data['work_schedule'],
-		issuance_salary=data['issuance_salary'],
-		vocation=data['vocation'],
-		subvocation=data.get('subvocation', None),
-		age_group=data['age_group'],
-		experience=data['experience'],
-		salary=int(data['salary']),
-		rate=data['rate'],
-		rate_type=data['rate_type'],
-		phone_number=data.get('phone_number', None),
-		telegram_link=data.get('telegram_link', None),
-		photo_id=data['photo_id'],
-		communications=data['communication_data'],
-		user=user,
-		published=callback_data.published,
-		resume_sub=data.get('resume_sub', False),
-		time_expired=datetime.now() + delta
-	)	
+		await vacancy.save()
+		await user.save()
 
-	user.last_vacancy_name = data['name']	
-
-	await new_vocation.save()
-	await user.save()
-
-	await callback.answer()
-	await message.reply(f"🟢 Вакансія збережена!")
+		await callback.answer()
+		await message.reply(f"🟢 Вакансія оновлена!")

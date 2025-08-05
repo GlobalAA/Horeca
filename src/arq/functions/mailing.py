@@ -23,17 +23,17 @@ async def cv_mailing(ctx):
 			filters = {
 				'city': vacancy.city,
 				'vocation': vacancy.vocation,
-				'age_group': vacancy.age_group,
+				'age_group__lte': int(vacancy.age_group),
 				'min_salary__lt': vacancy.salary
 			}
 
 			if vacancy.subvocation:
 				filters['subvocation'] = vacancy.subvocation
-			if vacancy.district != DistrictEnum.ALL.value:
+			if vacancy.district != DistrictEnum.ALL.value[0]:
 				filters['district'] = vacancy.district
 
 			cvs = await CVs.filter(**filters).prefetch_related("user").all()
-			print(cvs, filters)
+
 			if not cvs:
 				continue
 
@@ -101,13 +101,13 @@ async def vacancy_mailing(ctx):
 		filters = {
 			'city': cv.city,
 			'vocation': cv.vocation,
-			'age_group': cv.age_group,
+			'age_group__gte': cv.age_group,
 			'salary__gt': cv.min_salary
 		}
 
 		if cv.subvocation:
 			filters['subvocation'] = cv.subvocation
-		if cv.district != DistrictEnum.ALL.value:
+		if cv.district != DistrictEnum.ALL.value[0]:
 			filters['district'] = cv.district
 
 		vacancies = await Vacancies.filter(**filters).all().prefetch_related("user")
@@ -116,7 +116,6 @@ async def vacancy_mailing(ctx):
 			bot: Bot = ctx['bot']
 
 			if cv.id in vacancy.cvs_id:
-				print(1)
 				continue
 
 			vocation = vacancy.vocation
@@ -129,17 +128,18 @@ async def vacancy_mailing(ctx):
 			communication_text = vacancy.phone_number if vacancy.phone_number else vacancy.telegram_link
 
 			text = f"""Заклад <i>{vacancy.name}</i>
-		➖➖➖➖➖
-		📍 Місто: {vacancy.city.value}
-		🏠 Район: {vacancy.district}
-		♟ {vocation}
-		⏱️ Графік роботи: {vacancy.work_schedule}
-		💰 Заробітна плата: {int(vacancy.salary)} | Ставка: {vacancy.rate}
-		📆 Видається з/п: {vacancy.issuance_salary}
-		👨‍🦳 Вік: до {vacancy.age_group}
-		💡 Досвід роботи: {vacancy.experience.value}
-		📞 Для зв'язку: {communication_text} | {vacancy.user.full_name}
-		📩 Спосіб зв'язку: {vacancy.communications.value}"""
+➖➖➖➖➖
+📍 Місто: {vacancy.city.value}
+🏠 Район: {vacancy.district}
+♟ {vocation}
+⏱️ Графік роботи: {vacancy.work_schedule}
+💰 Заробітна плата: {int(vacancy.salary)} | Ставка: {vacancy.rate}
+📆 Видається з/п: {vacancy.issuance_salary}
+👨‍🦳 Вік: до {vacancy.age_group}
+💡 Досвід роботи: {vacancy.experience.value}
+📰 Додаткова інформація: {vacancy.additional_information if vacancy.additional_information else "Не вказано"}
+📞 Для зв'язку: {communication_text} | {vacancy.user.full_name}
+📩 Спосіб зв'язку: {vacancy.communications.value}"""
 			
 			if vacancy.photo_id:
 				await bot.send_photo(cv.user.user_id, vacancy.photo_id, caption=text)

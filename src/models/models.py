@@ -1,3 +1,5 @@
+from typing import Optional
+
 from tortoise import fields
 from tortoise.contrib.postgres.fields import ArrayField
 from tortoise.models import Model
@@ -44,7 +46,7 @@ class Vacancies(Model):
 	work_schedule = fields.CharField(max_length=255)
 	issuance_salary = fields.CharField(max_length=255)
 	vocation = fields.CharEnumField(VocationEnum)
-	subvocation = fields.CharField(max_length=255, null=True)
+	subvocation: Optional[str] = fields.CharField(max_length=255, null=True) #type: ignore
 	age_group = fields.IntEnumField(AgeGroupEnum)
 	experience = fields.CharEnumField(ExperienceEnum)
 	city = fields.CharEnumField(CityEnum)
@@ -52,8 +54,9 @@ class Vacancies(Model):
 	rate = fields.CharField(max_length=255)
 	rate_type = fields.CharEnumField(RateTypeEnum)
 	salary = fields.IntField()
-	phone_number = fields.CharField(max_length=255, null=True)
-	telegram_link = fields.CharField(max_length=255, null=True)
+	additional_information: Optional[str] = fields.CharField(max_length=255, null=True) #type: ignore
+	phone_number: Optional[str] = fields.CharField(max_length=255, null=True) #type: ignore
+	telegram_link: Optional[str] = fields.CharField(max_length=255, null=True) #type: ignore
 	photo_id = fields.CharField(max_length=255, null=True)
 	communications = fields.CharEnumField(CommunicationMethodEnum)
 	published = fields.BooleanField(default=False)
@@ -119,12 +122,3 @@ class Comment(Model):
 		related_name="comments",
 		on_delete=fields.CASCADE
 	)
-class UsefulInformation(Model):
-	id = fields.IntField(pk=True)
-	file_id = fields.CharField(max_length=255)
-	user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
-		"models.User", related_name="usefuli"
-	)
-
-	class Meta(Model.Meta):
-		table = "Useful information"

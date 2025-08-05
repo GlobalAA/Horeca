@@ -1,9 +1,9 @@
 from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from callbacks.types import ExperienceVacancyData
+from callbacks.types import DeleteVocation, ExperienceVacancyData, ResetData
 from keyboards.back_keyboard import append_back_button
-from models.enums import PriceOptionEnum
+from models.enums import PriceOptionEnum, UserRoleEnum
 from models.models import ExperienceVacancy, Subscriptions, User, Vacancies
 
 
@@ -57,15 +57,19 @@ def send_vocation(full_name: str, vocations: list[Vacancies | ExperienceVacancy]
 ➖➖➖➖➖
 📍 Місто: {vocation_model.city.value}
 🏠 Район: {vocation_model.district}
-♟ {vocation}
+♟ Шукає: {vocation}
 ⏱️ Графік роботи: {vocation_model.work_schedule}
 💰 Заробітна плата: {int(vocation_model.salary)} | Ставка: {vocation_model.rate}
 📆 Видається з/п: {vocation_model.issuance_salary}
 👨‍🦳 Вік: до {vocation_model.age_group}
+📰 Додаткова інформація: {vocation_model.additional_information if isinstance(vocation_model, Vacancies) and vocation_model.additional_information else "Не вказано"}
 💡 Досвід роботи: {vocation_model.experience.value if isinstance(vocation_model, Vacancies) else 'Не вказано'}
 📞 Для зв'язку: {communication_text} | {full_name}
-📩 Спосіб зв'язку: {vocation_model.communications.value}"""
-	
+📩 Спосіб зв'язку: {vocation_model.communications.value}
+"""
+
+	if not view_all and isinstance(vocation_model, Vacancies):
+		text += f"➖➖➖➖➖\n📆 Опублікована до: {vocation_model.time_expired.strftime('%d.%m.%Y')}"
 	builder = InlineKeyboardBuilder()
 
 	if not view_all:
@@ -75,8 +79,11 @@ def send_vocation(full_name: str, vocations: list[Vacancies | ExperienceVacancy]
 		builder.button(text="⬅️ Назад", callback_data=f"slider_prev_vacancies:{view_all}")
 	if index < total - 1:
 		builder.button(text="➡️ Вперед", callback_data=f"slider_next_vacancies:{view_all}")
-	if not view_all:
-		builder.button(text="Продовжити публікацію", callback_data="extend_publication")
+
+	if not view_all and isinstance(vocation_model, Vacancies):
+		builder.button(text="🔄 Заповнити дані заново", callback_data=ResetData(type=UserRoleEnum.EMPLOYER, for_update=True))
+		builder.button(text="🗑 Видалити", callback_data=DeleteVocation(vocation_id=vocation_model.id))
+		builder.button(text="Продовжити термін публікації", callback_data="extend_publication")
 
 	if view_all:
 		builder.button(text="🟢 Обрати", callback_data=ExperienceVacancyData(vacancy_id=vocation_model.id))

@@ -49,7 +49,6 @@ class ImageData(CallbackData, prefix="image"):
 class RateTypeData(CallbackData, prefix="reset_type"):
 	user_id: int
 	rate_type: RateTypeEnum
-
 	
 class CommunicationMethodData(CallbackData, prefix="communication_method"):
 	user_id: int
@@ -62,6 +61,7 @@ class BackData(CallbackData, prefix="back"):
 
 class ResetData(CallbackData, prefix="reset"):
 	type: UserRoleEnum
+	for_update: bool
 
 class FinalDataCv(CallbackData, prefix="final"):
 	published: bool
@@ -89,6 +89,9 @@ class UnPublishCv(CallbackData, prefix="unpublish_cv"):
 
 class DeleteCv(CallbackData, prefix="delete_cv"):
 	action: str
+
+class DeleteVocation(CallbackData, prefix="delete_vocation"):
+	vocation_id: int
 
 class ExtendPublicationData(CallbackData, prefix="extend_publication"):
 	index: int

@@ -5,8 +5,8 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from callbacks.types import (DeleteCv, ExtendPublicationData, MyCvData,
-                             MyVocationData, UnPublishCv)
+from callbacks.types import (DeleteCv, DeleteVocation, ExtendPublicationData,
+                             MyCvData, MyVocationData, UnPublishCv)
 from config import config
 from keyboards import edit_keyboard, get_cvs_keyboard
 from keyboards.vocation_keybaord import vocation_keyboard_price
@@ -139,6 +139,32 @@ async def vocation_get(callback: CallbackQuery, state: FSMContext):
 		return await message.answer_photo(vacancy.photo_id, caption=text, reply_markup=markup)
 	
 	await message.edit_text(text=text, reply_markup=markup)
+
+@cabinet_router.callback_query(DeleteVocation.filter())
+async def delete_vocation(callback: CallbackQuery, callback_data: DeleteVocation, state: FSMContext):
+	data = await state.get_data()
+	steps = data.get('delete_step', 1)
+
+	if steps <= 1:
+		await callback.answer("Натисніть ще раз, щоб підтвердити видалення")
+		return await state.update_data(delete_step=steps + 1)
+	
+	vocation = await Vacancies.get_or_none(id=callback_data.vocation_id)
+
+	if not vocation:
+		await callback.answer()
+		return await callback.message.reply("🔴 Сталася помилка, вакансію не знайдено, зверніться до адміністратора")
+	
+	await state.clear()
+	await vocation.delete()
+
+	message = cast(Message, callback.message)
+
+	if not vocation.photo_id:
+		await message.edit_text("🟢 Вакансія успішно видалена!")
+	else:
+		await message.delete()	
+		await message.answer("🟢 Вакансія успішно видалена!")
 
 @cabinet_router.callback_query(F.data == "extend_publication")
 async def extend_publication(callback: CallbackQuery, state: FSMContext):

@@ -63,7 +63,7 @@ async def save_experience_and_continue(state: FSMContext, vacancy: Vacancies | N
 		return await push_state(state, CVState.choosing_min_salary)
 
 
-@router_seeker.callback_query(ResetData.filter(F.type == UserRoleEnum.SEEKER))
+@router_seeker.callback_query(ResetData.filter(F.type == UserRoleEnum.SEEKER), ResetData.filter(F.for_update == False))
 async def reset_handler(callback: CallbackQuery, state: FSMContext):
 	await state.clear()
 	
@@ -333,7 +333,6 @@ async def choosing_experience_name(message: Message, state: FSMContext):
 @router_seeker.message(CVState.choosing_min_salary)
 async def choosing_min_salary_callback(message: Message, state: FSMContext):
 	min_salary = message.text 
-	print(await state.get_data())
 	try:
 		min_salary = int(min_salary) #type: ignore
 	except ValueError:

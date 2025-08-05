@@ -7,7 +7,7 @@ from aiogram.types import Message
 
 from callbacks.states import AdminInfoState
 from models.enums import PriceOptionEnum
-from models.models import UsefulInformation, User, UserRoleEnum, Vacancies
+from models.models import User, UserRoleEnum, Vacancies
 
 
 class RoleFilter(BaseFilter):
@@ -49,39 +49,3 @@ async def admin(message: Message):
 	])
 
 	await message.answer(text)
-
-@admin_router.message(Command("change_info"), StateFilter(None), RoleFilter(UserRoleEnum.ADMIN))
-async def admin_info(message: Message, state: FSMContext):
-	await message.answer("Вітаю, для того, щоб оновити корисну інформацію для користувачів (роботодавців), надішліть мені файл")
-
-	await state.set_state(AdminInfoState.send_document)
-
-@admin_router.message(StateFilter(AdminInfoState.send_document), RoleFilter(UserRoleEnum.ADMIN), F.document)
-async def admin_info_document(message: Message, state: FSMContext):
-	if not message.document:
-		await message.answer("Надішліть мені файл")
-		return
-
-	user = await User.get_or_none(user_id=message.from_user.id)
-
-	if not user:
-		return await message.answer("🔴 Сталася помилка, користувача не знайдено")
-
-	file_id = message.document.file_id
-
-	try:
-		first = await UsefulInformation.first()
-		if first:
-			await first.delete()
-
-		new_information = UsefulInformation(
-			file_id=file_id,
-			user=user
-		)
-
-		await new_information.save()
-
-		await message.answer("Файл збережено, та меню /info оновлено")
-	except Exception as e:
-		print(f"{e}: AdminInfoState.save_document")
-		return await message.answer("🔴 Сталася помилка")

@@ -19,7 +19,7 @@ def builder_add(builder: InlineKeyboardBuilder, text_data: dict[PriceOptionEnum,
 	return builder
 
 
-def vocation_keyboard_price(balance: float, vip: bool, extend: bool = False, index: int = 0) -> InlineKeyboardMarkup:
+def vocation_keyboard_price(balance: float, vip: bool, extend: bool = False, index: int = 0, update: bool = False) -> InlineKeyboardMarkup:
 	builder = InlineKeyboardBuilder()
 
 	text_data = {
@@ -29,20 +29,26 @@ def vocation_keyboard_price(balance: float, vip: bool, extend: bool = False, ind
 		PriceOptionEnum.VIP: "🍀 Розмістити за допомогою підписки",
 	}
 
-	for name, value in config.price_options:
-		enum = PriceOptionEnum[name]
+	if not update:
+		for name, value in config.price_options:
+			enum = PriceOptionEnum[name]
 
-		if enum == PriceOptionEnum.VIEW_COMMENTS:
-			continue
-		
-		if vip and enum == PriceOptionEnum.VIP:
-			builder_add(builder, text_data, enum, name, value, extend, index)
-			break
-		
-		if value <= balance:
-			if enum == PriceOptionEnum.VIP:
+			if enum == PriceOptionEnum.VIEW_COMMENTS:
 				continue
-			builder_add(builder, text_data, enum, name, value, extend, index)
+			
+			if vip and enum == PriceOptionEnum.VIP:
+				builder_add(builder, text_data, enum, name, value, extend, index)
+				break
+			
+			if value <= balance:
+				if enum == PriceOptionEnum.VIP:
+					continue
+				builder_add(builder, text_data, enum, name, value, extend, index)
+	else:
+		builder.button(
+			text="Продовжити публікацію",
+			callback_data=FinalDataVocation(published=False, price_option=PriceOptionEnum.FREE, price=0)
+		)
 	
 	builder.adjust(1)
 

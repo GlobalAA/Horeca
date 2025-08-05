@@ -5,10 +5,10 @@ from callbacks.types import ResetData
 from models.enums import UserRoleEnum
 
 
-def reset_keyboard(role: UserRoleEnum = UserRoleEnum.SEEKER) -> InlineKeyboardMarkup:
+def reset_keyboard(role: UserRoleEnum = UserRoleEnum.SEEKER, for_update: bool = False) -> InlineKeyboardMarkup:
 	builder = InlineKeyboardBuilder()
 
-	builder.button(text="🔄 Почати спочатку", callback_data=ResetData(type=role))
+	builder.button(text="🔄 Почати спочатку", callback_data=ResetData(type=role, for_update=for_update))
 	
 	builder.adjust(1)
 
