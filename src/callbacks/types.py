@@ -79,6 +79,7 @@ class PriceData(CallbackData, prefix="price_data"):
 
 class DetailData(CallbackData, prefix="detail_data"):
 	price_option: PriceOptionEnum
+	action: str
 
 class MyCvData(CallbackData, prefix="cv_data"):
 	action: str
@@ -95,9 +96,9 @@ class DeleteCv(CallbackData, prefix="delete_cv"):
 class DeleteVocation(CallbackData, prefix="delete_vocation"):
 	vocation_id: int
 
-class ExtendPublicationData(CallbackData, prefix="extend_publication"):
-	index: int
-	extend_type: PriceOptionEnum
+class ExtendPublicationDetail(DetailData, prefix="extend_publication_detail"): ...
+
+class ExtendPublicationPrice(PriceData, prefix="extend_publication_price"): ...
 
 class VacancyNameSkip(CallbackData, prefix="vacancy_name_skip"):
 	last_name: str

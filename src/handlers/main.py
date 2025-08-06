@@ -1,5 +1,6 @@
 from aiogram import Router
 from aiogram.filters import Command, CommandStart, StateFilter
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
 
 from keyboards import start_keyboard
@@ -9,8 +10,8 @@ from utils.cabinet_text import get_cabinet_text
 
 router = Router()
 
-@router.message(StateFilter(None), CommandStart())
-async def start_message(message: Message):
+@router.message(CommandStart())
+async def start_message(message: Message, state: FSMContext):
 	await message.answer(f"Вітаємо, {message.from_user.first_name}!\nЗа допомогою даного боту Ви можете швидко й зручно знайти співробітника для свого закладу або бажану роботу.", reply_markup=start_keyboard())
 
 	username = message.from_user.username

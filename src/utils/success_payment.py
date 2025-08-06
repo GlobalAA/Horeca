@@ -5,7 +5,7 @@ from aiogram.types import CallbackQuery, Message
 
 from callbacks.types import PriceData
 from models.enums import PriceOptionEnum
-from models.models import Subscription, User
+from models.models import Subscription, User, Vacancies
 from utils import save_vacancy
 
 
@@ -67,7 +67,6 @@ async def success_payment(state: FSMContext, message: Message, user_id: int, cal
 						now = datetime.now(subscription.time_expired.tzinfo)
 					
 					if not subscription.time_expired or subscription.time_expired < now:
-						print(now, subscription.time_expired)
 						subscription.time_expired = now + delta
 					else:
 						subscription.time_expired += delta
@@ -102,26 +101,50 @@ async def success_payment(state: FSMContext, message: Message, user_id: int, cal
 		vacancy_id = data.get('update_id', None)
 
 		callback_data = PriceData(price_option=price_option, price=data.get('price', 0))
+		
+		extend = data.get('extend', False)
 
-		await save_vacancy(
-			update=update,
-			vacancy_id=vacancy_id,
-			callback_data=callback_data,
-			callback=callback,
-			user=user,
-			message=message,
-			state=state,
-			data=data,
-			publication_time=publication_time
-		)
+		if not extend:
+			await save_vacancy(
+				update=update,
+				vacancy_id=vacancy_id,
+				callback_data=callback_data,
+				callback=callback,
+				user=user,
+				message=message,
+				state=state,
+				data=data,
+				publication_time=publication_time
+			)
+		else:
+			vacancies_all = data.get('vacancies', [])
+			index = data.get('index', 0)
+			vacancy_id = vacancies_all[index]
+
+			vacancy: Vacancies | None = await Vacancies.get_or_none(id=vacancy_id)
+
+			if not vacancy:
+				return await callback.answer("Вакансію не знайдено")
+			
+			delta = publication_time - datetime.now()
+			
+			vacancy.time_expired += delta
+			await callback.answer()
+
+			await message.delete()
+			await message.answer(f"🟢 Вакансія продовжена до {vacancy.time_expired.strftime("%d.%m.%Y")}")
+			await vacancy.save()
 
 		bot = message.bot
 
-		for id in price_ids:
-			await bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=id, reply_markup=None)
-		
-		for id in msg_ids:
-			await bot.delete_message(chat_id=message.chat.id, message_id=id)
+		if not extend:
+			for id in price_ids:
+				await bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=id, reply_markup=None)
+			
+			for id in msg_ids:
+				await bot.delete_message(chat_id=message.chat.id, message_id=id)
+
+		await state.clear()
 
 	except KeyError:
 		await message.answer("Сталася помилка, зверніться до адміністратора!")

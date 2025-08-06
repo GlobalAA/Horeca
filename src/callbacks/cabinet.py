@@ -5,8 +5,9 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
-from callbacks.types import (DeleteCv, DeleteVocation, ExtendPublicationData,
-                             MyCvData, MyVocationData, UnPublishCv)
+from callbacks.types import (DeleteCv, DeleteVocation, ExtendPublicationDetail,
+                             ExtendPublicationPrice, MyCvData, MyVocationData,
+                             UnPublishCv)
 from config import config
 from keyboards import edit_keyboard, get_cvs_keyboard
 from keyboards.vocation_keybaord import vocation_keyboard_price
@@ -142,13 +143,6 @@ async def vocation_get(callback: CallbackQuery, state: FSMContext):
 
 @cabinet_router.callback_query(DeleteVocation.filter())
 async def delete_vocation(callback: CallbackQuery, callback_data: DeleteVocation, state: FSMContext):
-	data = await state.get_data()
-	steps = data.get('delete_step', 1)
-
-	if steps <= 1:
-		await callback.answer("Натисніть ще раз, щоб підтвердити видалення")
-		return await state.update_data(delete_step=steps + 1)
-	
 	vocation = await Vacancies.get_or_none(id=callback_data.vocation_id)
 
 	if not vocation:
@@ -180,96 +174,21 @@ async def extend_publication(callback: CallbackQuery, state: FSMContext):
 
 	is_vip = PriceOptionEnum.VIP in subscriptions
 
-	bad_balance = get_min_price() > user.balance
-
-	if bad_balance:
-		callback.answer()
-		return await callback.message.answer("🔴 На жаль, на вашому балансі недостатньо коштів. Поповніть баланс для створення вакансій!")
-
-	if user.on_week <= 0 and bad_balance and PriceOptionEnum.VIP in subscriptions:
-		callback.answer()
-		return await callback.message.answer("🔴 Ви вже витратили усі свої можливості на створення вакансій. Чекайте оновлення наступного місяця")
-
 	data = await state.get_data()
 	index = data['index']
+	msg_ids: list[int] = data.get('msg_ids', [])
+
 
 	await callback.answer()
 	await message.edit_reply_markup(reply_markup=None)
-	await message.reply(
+	msg = await message.reply(
 		"Варіант продовження", reply_markup=vocation_keyboard_price(
-			balance=user.balance,
 			vip=is_vip,
 			extend=True,
-			index=index
 		)
 	)	
-
-@cabinet_router.callback_query(ExtendPublicationData.filter())
-async def extend_publication_next(callback: CallbackQuery, callback_data: ExtendPublicationData, state: FSMContext):
-	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("subscriptions", "vacancies")
-
-	if not user:
-		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
-	
-	data = await state.get_data()
-	index = data['index']
-
-	vacancies: list[Vacancies] = await user.vacancies.all() #type: ignore
-	vacancy = vacancies[index]
-
-	subscriptions: list[PriceOptionEnum] = [sub.status for sub in user.subscriptions] # type: ignore
-
-	message = cast(Message, callback.message)
-
-	if not vacancy:
-		await callback.answer()
-		return await message.answer("🔴 Будь ласка, зверніться до адміністратора, сталася помилка!")
-	
-	extend_type = callback_data.extend_type
-
-	resume_sub_in_subscriptions = PriceOptionEnum.RESUME_SUB in subscriptions
-	is_vip = PriceOptionEnum.VIP in subscriptions and extend_type == PriceOptionEnum.VIP
-
-	is_week = extend_type == PriceOptionEnum.ONE_WEEK
-	is_day = extend_type == PriceOptionEnum.ONE_DAY
-
-	if is_week or is_day:
-		price = config.price_options.ONE_WEEK if is_week else config.price_options.ONE_DAY
-		if user.balance <  price:
-			await callback.answer()
-			return await message.answer("🔴 На вашому балансі недостатньо коштів для здійснення операції")
-		user.balance -= int(price)
-		vacancy.time_expired = vacancy.time_expired + timedelta(weeks=1)
-
-		await vacancy.save()
-		await user.save()
-
-		await message.edit_text("Публікація вашої вакансії продовжена ще на тиждень")
-	
-	if extend_type == PriceOptionEnum.RESUME_SUB:
-		if not resume_sub_in_subscriptions:
-			await callback.answer()
-			return await message.answer("В вашому тарифі не неможливо зробити, перейдіть в профіль, щоб оформити підписку/поповнити баланс")
-
-		vacancy.resume_sub = True
-
-		await vacancy.save()
-
-		await message.edit_text("Тепер вам будуть надсилатись резюме, які підходять під ваші критерії")
-	
-	if is_vip:
-		if user.on_week > 0:
-			user.on_week -= 1
-
-			vacancy.time_expired = vacancy.time_expired + timedelta(weeks=1)
-
-			await vacancy.save()
-			await user.save()
-			
-			await message.edit_text(f"За допомогою підписки, ви опублікували вакансію ще на один тиждень! У вас залишилось: {user.on_week} пуб.")
-	
-	await state.clear()
-	await callback.answer()
+	msg_ids.append(msg.message_id)
+	await state.update_data(extend=True, msg_ids=msg_ids)
 
 @cabinet_router.callback_query(F.data == "view_comments")
 async def view_comments(callback: CallbackQuery, state: FSMContext):

@@ -1,4 +1,5 @@
-from datetime import timedelta
+import re
+from datetime import datetime, timedelta
 from typing import cast
 
 from aiogram import F, Router
@@ -11,7 +12,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from callbacks.states import VocationState
 from callbacks.types import (AgeGroupData, BackData, CityData,
                              CommunicationMethodData, DetailData, DistrictData,
-                             ExperienceData, ImageData, PriceData,
+                             ExperienceData, ExtendPublicationDetail,
+                             ExtendPublicationPrice, ImageData, PriceData,
                              RateTypeData, ResetData, SubvocationData,
                              VacancyNameSkip, VocationData)
 from config import config
@@ -288,7 +290,15 @@ async def choosing_salary(message: Message, state: FSMContext):
 async def choosing_rate_type(callback: CallbackQuery, callback_data: RateTypeData, state: FSMContext):
 	await state.update_data(rate_type=callback_data.rate_type)
 
-	await callback.message.answer("Введіть ставку", reply_markup=append_back_button(None, "choosing_rate_type", UserRoleEnum.EMPLOYER))
+	text = "Введіть ставку"
+	if callback_data.rate_type == RateTypeEnum.PRECENT:
+		text += "\n\nПриклад: 10%, 5%, 15%\nОбов'язково має бути %"
+	if callback_data.rate_type == RateTypeEnum.RATE:
+		text += "\n\nПриклад: 1000, 10000, 100\nСтавка має бути вказана без <b>грн</b>"
+	if callback_data.rate_type == RateTypeEnum.PRECENT_RATE:
+		text += "\n\nПриклад: 1000 10%, 2000 5%, 3000 15%.\nСпочатку ставка (без валюти), потім відсоток (обов'язково знак відсотку %)"
+
+	await callback.message.answer(text, reply_markup=append_back_button(None, "choosing_rate_type", UserRoleEnum.EMPLOYER))
 
 	await callback.answer()
 	await push_state(state, VocationState.choosing_rate)
@@ -298,6 +308,8 @@ async def choosing_rate(message: Message, state: FSMContext):
 	data = await state.get_data()
 	rate_type: RateTypeEnum = data['rate_type']
 
+	if rate_type == RateTypeEnum.RATE and not re.fullmatch(r"\d+", str(message.text)):
+		return await message.answer("🔴 Невірний формат ставки.\n\nДоступні формати: 1000, 10000, 2000")
 	if rate_type == RateTypeEnum.PRECENT and not percent_validate(str(message.text)):
 		return await message.answer("🔴 Невірний формат ставки.\n\nДоступні формати: 100%, 50%, 10%")
 	if rate_type == RateTypeEnum.PRECENT_RATE and not percent_validate(str(message.text), percent_with_rate=True):
@@ -468,19 +480,99 @@ async def data_full_get(message: Message, state: FSMContext, user_id: int, photo
 	if is_vip and user.on_week <= 0:
 		is_vip = False
 
-	vocation_final_reset = vocation_keyboard_price(balance=user.balance, vip=is_vip, update=update).inline_keyboard + reset_keyboard_inline
+	vocation_final_reset = vocation_keyboard_price(vip=is_vip, update=update).inline_keyboard + reset_keyboard_inline
 
 	vocation_final_reset_markup = InlineKeyboardMarkup(inline_keyboard=vocation_final_reset)
+	prices_id: list[int] = data.get("price_ids", [])
+
+	sended_message: Message | None = None
 
 	if not photo:
-		await message.answer(full_data, reply_markup=vocation_final_reset_markup, disable_web_page_preview=True)
+		sended_message = await message.answer(full_data, reply_markup=vocation_final_reset_markup, disable_web_page_preview=True)
 	else:
-		await message.answer_photo(photo.file_id, full_data, reply_markup=vocation_final_reset_markup)
+		sended_message = await message.answer_photo(photo.file_id, full_data, reply_markup=vocation_final_reset_markup)
 
-	await state.update_data(photo_id=photo.file_id if photo else None)
+	prices_id.append(sended_message.message_id)
+
+	await state.update_data(photo_id=photo.file_id if photo else None, price_ids=prices_id)
 	await push_state(state, VocationState.choosing_price)
 
-@router_employer.callback_query(VocationState.choosing_price, DetailData.filter())
+@router_employer.callback_query(VocationState.choosing_price, DetailData.filter(F.action == "is_vip"))
+@router_employer.callback_query(ExtendPublicationDetail.filter(F.action == "is_vip"))
+async def publication_vocation(callback: CallbackQuery, callback_data: DetailData, state: FSMContext):
+	data = await state.get_data()
+
+	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("subscriptions")
+
+	if not user:
+		return await callback.message.answer("Користувача не знайдено, зверніться до адміністратора!")
+	
+	subscriptions: list[PriceOptionEnum] = [sub.status for sub in user.subscriptions] # type: ignore
+
+	is_vip = PriceOptionEnum.VIP in subscriptions
+
+	if is_vip and user.on_week <= 0:
+		return await callback.answer("Ви вже витратили усі свої публікації")
+
+	user.on_week -= 1
+	
+	price_ids = data.get("price_ids", [])
+	msg_ids = data.get('msg_ids', [])
+	message = cast(Message, callback.message)
+
+	bot = message.bot
+
+	for id in price_ids:
+		await bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=id, reply_markup=None)
+	
+	for id in msg_ids:
+		await bot.delete_message(chat_id=message.chat.id, message_id=id)
+
+	callback_data_save = PriceData(price_option=callback_data.price_option, price=data.get('price', 0))
+
+	extend = data.get('extend', False)
+
+	if not extend:
+		await save_vacancy(
+			False,
+			None, 
+			callback_data_save,
+			callback,
+			user,
+			cast(Message, callback.message),
+			state,
+			data,
+			datetime.now() + timedelta(days=7)
+		)
+	else:
+		vacancies_all = data.get('vacancies', [])
+		index = data.get('index', 0)
+		vacancy_id = vacancies_all[index]
+
+		vacancy: Vacancies | None = await Vacancies.get_or_none(id=vacancy_id)
+
+		if not vacancy:
+			return await callback.answer("Вакансію не знайдено")
+
+		if user.on_week > 0:
+			user.on_week -= 1
+		else:
+			await callback.answer()
+			return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
+	
+		vacancy.time_expired += timedelta(days=7)
+		await callback.answer()
+
+		await message.delete()
+		await message.answer(f"🟢 Вакансія продовжена до {vacancy.time_expired.strftime("%d.%m.%Y")}")
+		await vacancy.save()
+		
+	
+	await user.save()
+	await state.clear()
+
+@router_employer.callback_query(VocationState.choosing_price, DetailData.filter(F.action != "is_vip"))
+@router_employer.callback_query(ExtendPublicationDetail.filter(F.action != "is_vip"))
 async def vocation_get_information(callback: CallbackQuery, callback_data: DetailData, state: FSMContext):
 	text_data = {
 		PriceOptionEnum.VIP: {
@@ -514,6 +606,7 @@ async def vocation_get_information(callback: CallbackQuery, callback_data: Detai
 	await state.update_data(msg_ids=msg_ids)
 
 @router_employer.callback_query(VocationState.choosing_price, F.data == "no_select")
+@router_employer.callback_query(F.data == "no_select")
 async def no_select(callback: CallbackQuery, state: FSMContext):
 	message = cast(Message, callback.message)
 
@@ -526,12 +619,58 @@ async def no_select(callback: CallbackQuery, state: FSMContext):
 		msg_ids.pop()
 		await state.update_data(msg_ids=msg_ids)
 
-@router_employer.callback_query(VocationState.choosing_price, PriceData.filter())
+@router_employer.callback_query(PriceData.filter())
 async def vocation_choosing_price(callback: CallbackQuery, callback_data: PriceData, state: FSMContext):
-	data = await state.get_data()
+	message = cast(Message, callback.message)
 
+	data = await state.get_data()
+	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("subscriptions")
+
+	if not user:
+		await callback.answer()
+		return await message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
+
+	update = data.get('update', False)
+	vacancy_id = data.get('update_id', None)
+
+	if callback_data.price_option == PriceOptionEnum.FREE and update:
+		vacancy = await Vacancies.get_or_none(id=vacancy_id, user=user)
+
+		if not vacancy:
+			return await callback.answer("🔴 Вакансію не знайдено")
+
+		vacancy.city = data['city']
+		vacancy.district = data['district']
+		vacancy.address = data['address']
+		vacancy.name = data['name']
+		vacancy.work_schedule = data['work_schedule']
+		vacancy.issuance_salary = data['issuance_salary']
+		vacancy.vocation = data['vocation']
+		vacancy.subvocation = data.get('subvocation', None)
+		vacancy.age_group = data['age_group']
+		vacancy.experience = data['experience']
+		vacancy.salary = int(data['salary'])
+		vacancy.rate = data['rate']
+		vacancy.rate_type = data['rate_type']
+		vacancy.additional_information = data.get('additional_information', None)
+		vacancy.phone_number = data.get('phone_number', None)
+		vacancy.telegram_link = data.get('telegram_link', None)
+		vacancy.photo_id = data['photo_id']
+		vacancy.communications = data['communication_data']
+		vacancy.published = vacancy.published
+		vacancy.resume_sub = data.get('resume_sub', False)
+
+		user.last_vacancy_name = data['name']	
+
+		await vacancy.save()
+		await user.save()
+
+		await callback.answer()
+		await message.reply(f"🟢 Вакансія оновлена!")
+		await state.clear()
+		return 
+	
 	msg_ids = data.get("msg_ids", []) 
-	prices_id = data.get("price_ids", [])
 
 	for id in msg_ids:
 		await callback.bot.delete_message(chat_id=callback.from_user.id, message_id=id)
@@ -543,37 +682,29 @@ async def vocation_choosing_price(callback: CallbackQuery, callback_data: PriceD
 
 	if not data:
 		return await callback.answer("🔴 Дані не знайдено")
-	
-	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("subscriptions")
 
 	text_data = {
 		PriceOptionEnum.ONE_DAY: {
 			"text": "Публікація оголошення на день",
-			"price": 50
+			"price": config.price_options.ONE_DAY
 		},
 		PriceOptionEnum.ONE_WEEK: {
 			"text": "Публікація оголошення на тиждень",
-			"price": 300
+			"price": config.price_options.ONE_WEEK
 		},
 		PriceOptionEnum.VIP: {
 			"text": "Тариф VIP",
-			"price": 2000
+			"price": config.price_options.VIP
 		},
 		PriceOptionEnum.VIP_PLUS: {
 			"text": "Тариф VIP+",
-			"price": 3000
+			"price": config.price_options.VIP_PLUS
 		},
 		PriceOptionEnum.VIP_MAX: {
 			"text": "Тариф VIP MAX",
-			"price": 4000
+			"price": config.price_options.VIP_MAX
 		}
 	}
-
-	message = cast(Message, callback.message)
-
-	if not user:
-		await callback.answer()
-		return await message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 	
 	current_text = text_data[callback_data.price_option]
 
@@ -608,10 +739,9 @@ async def vocation_choosing_price(callback: CallbackQuery, callback_data: PriceD
 
 	msg = await message.answer(text, reply_markup=purchase_keyboard(invoice_url, invoice_id))
 
-	prices_id.append(message.message_id)
 	msg_ids.append(msg.message_id)
 
-	await state.update_data(price_ids=prices_id, msg_ids=msg_ids, price_enum=callback_data.price_option, price=callback_data.price)
+	await state.update_data(msg_ids=msg_ids, price_enum=callback_data.price_option, price=callback_data.price)
 
 @router_employer.callback_query(F.data.startswith("pay_cancel"))
 async def pay_cancel(callback: CallbackQuery, state: FSMContext):
@@ -622,7 +752,7 @@ async def pay_cancel(callback: CallbackQuery, state: FSMContext):
 
 		if not result["success"]:
 			error_result = cast(MonoBankApi.ErrorDict, result)
-			return await callback.message.answer(text=f"{error_result["errCode"]}: {error_result["errText"]}")
+			return await callback.answer(text=f"{error_result["errText"]}")
 	
 	message = cast(Message, callback.message)
 
@@ -648,5 +778,5 @@ async def pay_check(callback: CallbackQuery, state: FSMContext):
 			case MonoBankApi.Status.SUCCESS:
 				return await success_payment(state, message, callback.from_user.id, callback)
 			case _:
-				return await callback.answer("Не вдалось перевірити статус")
+				return await callback.answer("Ви ще не взаємодіяли з рахунком")
 	

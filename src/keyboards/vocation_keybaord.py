@@ -1,20 +1,25 @@
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from callbacks.types import DetailData, ExtendPublicationData, PriceData
+from callbacks.types import DetailData, ExtendPublicationDetail, PriceData
 from config import config
 from models.enums import PriceOptionEnum
 
 
-def builder_add(builder: InlineKeyboardBuilder, text_data: dict[PriceOptionEnum, str], enum: PriceOptionEnum, name: str, value: int, extend: bool = False, index: int = 0) -> InlineKeyboardBuilder:
+def builder_add(builder: InlineKeyboardBuilder, text_data: dict[PriceOptionEnum, str], enum: PriceOptionEnum, value: int, extend: bool = False) -> InlineKeyboardBuilder:
 	vip_option = [PriceOptionEnum.VIP, PriceOptionEnum.VIP_PLUS, PriceOptionEnum.VIP_MAX]
-	# callback_data = FinalDataVocation(published=not name == PriceOptionEnum.RESUME_SUB, price_option=enum, price=value).pack()
 	callback_data = PriceData(price_option=enum, price=value).pack()
+
 	if enum in vip_option:
-		callback_data = DetailData(price_option=enum)
+		callback_data = DetailData(price_option=enum, action="")
+	if value <= 0 and enum in vip_option:
+		callback_data = DetailData(price_option=enum, action="is_vip")
 
 	if extend:
-		callback_data = ExtendPublicationData(index=index, extend_type=enum).pack()
+		if enum in vip_option:
+			callback_data = ExtendPublicationDetail(price_option=enum, action="").pack()
+		if enum in vip_option and value <= 0:
+			callback_data = ExtendPublicationDetail(price_option=enum, action="is_vip").pack()
 
 	builder.button(
 		text=text_data[enum],
@@ -23,7 +28,7 @@ def builder_add(builder: InlineKeyboardBuilder, text_data: dict[PriceOptionEnum,
 	return builder
 
 
-def vocation_keyboard_price(balance: float, vip: bool, extend: bool = False, index: int = 0, update: bool = False) -> InlineKeyboardMarkup:
+def vocation_keyboard_price(vip: bool, extend: bool = False, update: bool = False) -> InlineKeyboardMarkup:
 	builder = InlineKeyboardBuilder()
 
 	text_data = {
@@ -46,15 +51,13 @@ def vocation_keyboard_price(balance: float, vip: bool, extend: bool = False, ind
 				continue
 
 			if vip and enum == PriceOptionEnum.VIP:
-				builder_add(builder, vip_text_data, enum, name, value, extend, index)
+				builder_add(builder, vip_text_data, enum, 0, extend)
 				break
 			
-			if value <= balance:
-				builder_add(builder, text_data, enum, name, value, extend, index)
+			builder_add(builder, text_data, enum, value, extend)
 	else:
 		builder.button(
-			text="Продовжити публікацію",
-			# callback_data=FinalDataVocation(published=False, price_option=PriceOptionEnum.FREE, price=0)
+			text="Оновити публікацію",
 			callback_data=PriceData(price_option=PriceOptionEnum.FREE, price=0).pack()
 		)
 	

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any
 
 from aiogram.fsm.context import FSMContext
@@ -13,7 +13,7 @@ async def save_vacancy(update: bool, vacancy_id: int | None, callback_data: Pric
 	if not update and not vacancy_id:
 		subscriptions: list[PriceOptionEnum] = [sub.status for sub in user.subscriptions] # type: ignore
 
-		is_vip = PriceOptionEnum.VIP in subscriptions and callback_data.price_option == PriceOptionEnum.VIP
+		is_vip = PriceOptionEnum.VIP in subscriptions and callback_data.price_option in [PriceOptionEnum.VIP, PriceOptionEnum.VIP_PLUS, PriceOptionEnum.VIP_MAX]
 
 		resume_sub_in_subscriptions = PriceOptionEnum.RESUME_SUB in subscriptions
 
@@ -23,17 +23,6 @@ async def save_vacancy(update: bool, vacancy_id: int | None, callback_data: Pric
 			else:
 				await callback.answer()
 				return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
-		elif callback_data.price_option == PriceOptionEnum.RESUME_SUB:
-			if resume_sub_in_subscriptions:
-				data['resume_sub'] = True
-			else:
-				await callback.answer()
-				return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
-		else:
-			if user.balance <  callback_data.price:
-				await callback.answer()
-				return await message.answer("🔴 На вашому балансі недостатньо коштів для здійснення операції")
-			user.balance -= int(callback_data.price)
 
 		await state.clear()
 
@@ -58,7 +47,7 @@ async def save_vacancy(update: bool, vacancy_id: int | None, callback_data: Pric
 			communications=data['communication_data'],
 			user=user,
 			published=published,
-			resume_sub=data.get('resume_sub', False),
+			resume_sub=resume_sub_in_subscriptions,
 			time_expired=publication_time
 		)	
 
@@ -95,7 +84,7 @@ async def save_vacancy(update: bool, vacancy_id: int | None, callback_data: Pric
 		vacancy.photo_id = data['photo_id']
 		vacancy.communications = data['communication_data']
 		vacancy.published = vacancy.published
-		vacancy.resume_sub = data.get('resume_sub', False)
+		vacancy.resume_sub = vacancy.resume_sub
 
 		user.last_vacancy_name = data['name']	
 

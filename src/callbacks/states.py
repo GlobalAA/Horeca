@@ -37,8 +37,6 @@ class VocationState(StatesGroup):
 	choosing_communications = State()
 	choosing_photo_id = State()
 	choosing_price = State()
-	price_confirm = State()
-	final_state = State()
 	
 class VocationSlider(StatesGroup):
 	viewing = State()

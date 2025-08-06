@@ -23,6 +23,7 @@ router = Router()
 
 @router.callback_query(StateFilter(None), F.data == "search_work")
 async def search_work_callback(callback: CallbackQuery, state: FSMContext):
+	await state.clear()
 	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("cvs")
 
 	if not user:
@@ -39,23 +40,12 @@ async def search_work_callback(callback: CallbackQuery, state: FSMContext):
 
 @router.callback_query(StateFilter(None), F.data == "search_employer")
 async def search_employer_callback(callback: CallbackQuery, state: FSMContext):
+	await state.clear()
 	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("vacancies", "subscriptions")
 
 	if not user:
 		callback.answer()
 		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
-	
-	subscriptions: list[PriceOptionEnum] = [sub.status for sub in user.subscriptions] # type: ignore
-
-	bad_balance = get_min_price() > user.balance
-
-	if bad_balance:
-		callback.answer()
-		return await callback.message.answer("🔴 На жаль, на вашому балансі недостатньо коштів. Поповніть баланс для створення вакансій!")
-
-	if user.on_week <= 0 and bad_balance and PriceOptionEnum.VIP in subscriptions:
-		callback.answer()
-		return await callback.message.answer("🔴 Ви вже витратили усі свої можливості на створення вакансій. Чекайте оновлення наступного місяця")
 
 	await callback.message.answer('Оберіть місто', reply_markup=city_keyboard(callback.from_user.id))
 	await callback.answer()
