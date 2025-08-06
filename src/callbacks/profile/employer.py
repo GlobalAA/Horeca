@@ -105,10 +105,18 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
     "choosing_rate": "Введіть ставку",
     "choosing_issuance_salary": "Вкажіть формати видачі заробітної плати\n\nПриклад: раз в місяць, раз в день",
     "choosing_communications": "Виберіть метод комунікації",
+		"choosing_additional_information": "Ви хочете додати додаткову інформацію про вакансію?",
     "choosing_phone_number": "Вкажіть номер телефону",
     "choosing_telegram_link": "Надішліть посилання на телеграм, або тег",
     "choosing_photo_id": "Бажаєте додати зображення до вакансії? Надішліть або натисніть кнопку",
-}
+	}
+
+	for_additional_builder = InlineKeyboardBuilder()
+
+	for_additional_builder.button(
+		text="⏫ Продовжити без інформації",
+		callback_data="skip_information"
+	)
 
 	keyboard_map = {
     "choosing_city": lambda uid, _: city_keyboard(uid),
@@ -125,6 +133,7 @@ async def back_handler(callback: CallbackQuery, state: FSMContext):
     "choosing_salary": lambda *_: None,
     "choosing_rate": lambda uid, _: None,
     "choosing_issuance_salary": lambda *_: None,
+		"choosing_additional_information": lambda *_: for_additional_builder.as_markup(),
     "choosing_phone_number": lambda *_: None,
     "choosing_telegram_link": lambda *_: None,
     "choosing_photo_id": lambda uid, _: None,
@@ -463,8 +472,7 @@ async def data_full_get(message: Message, state: FSMContext, user_id: int, photo
 💰 Заробітна плата: {int(data['salary'])} | Ставка: {data['rate']}
 📆 Видається з/п: {data['issuance_salary']}
 👨‍🦳 Вік: до {data['age_group']}
-💡 Досвід роботи: {data['experience'].value}
-📰 Додаткова інформація: {data['additional_information'] if data.get('additional_information', None) else "Не вказано"}
+💡 Досвід роботи: {data['experience'].value}{f"\n📰 Додаткова інформація: {data['additional_information']}" if data.get('additional_information', None) else ""}
 📞 Для зв'язку: {communication_text} | {full_name}
 📩 Спосіб зв'язку: {data['communication_data'].value}
 """
@@ -524,7 +532,7 @@ async def publication_vocation(callback: CallbackQuery, callback_data: DetailDat
 
 	for id in price_ids:
 		await bot.edit_message_reply_markup(chat_id=message.chat.id, message_id=id, reply_markup=None)
-	
+
 	for id in msg_ids:
 		await bot.delete_message(chat_id=message.chat.id, message_id=id)
 
@@ -559,13 +567,21 @@ async def publication_vocation(callback: CallbackQuery, callback_data: DetailDat
 		else:
 			await callback.answer()
 			return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
-	
+		
 		vacancy.time_expired += timedelta(days=7)
+
+		resume_sub_in_subscriptions = PriceOptionEnum.RESUME_SUB in subscriptions
+
+		if resume_sub_in_subscriptions and not vacancy.resume_sub:
+			vacancy.resume_sub = True
+
+		if not resume_sub_in_subscriptions and vacancy.resume_sub:
+			vacancy.resume_sub = False
+
 		await callback.answer()
 
-		await message.delete()
-		await message.answer(f"🟢 Вакансія продовжена до {vacancy.time_expired.strftime("%d.%m.%Y")}")
 		await vacancy.save()
+		await message.answer(f"🟢 Вакансія продовжена до {vacancy.time_expired.strftime("%d.%m.%Y")}")
 		
 	
 	await user.save()
@@ -776,7 +792,7 @@ async def pay_check(callback: CallbackQuery, state: FSMContext):
 				await message.delete()
 				return await callback.answer("Транзакція вже не дійсна!")
 			case MonoBankApi.Status.SUCCESS:
-				return await success_payment(state, message, callback.from_user.id, callback)
+				return await success_payment(state, message, callback.from_user.id, callback, msg, invoice_id)
 			case _:
 				return await callback.answer("Ви ще не взаємодіяли з рахунком")
 	

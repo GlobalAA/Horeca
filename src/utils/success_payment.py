@@ -5,11 +5,11 @@ from aiogram.types import CallbackQuery, Message
 
 from callbacks.types import PriceData
 from models.enums import PriceOptionEnum
-from models.models import Subscription, User, Vacancies
+from models.models import PaymentHistory, Subscription, User, Vacancies
 from utils import save_vacancy
 
 
-async def success_payment(state: FSMContext, message: Message, user_id: int, callback: CallbackQuery):
+async def success_payment(state: FSMContext, message: Message, user_id: int, callback: CallbackQuery, msg: dict, invoice_id: str):
 	user = await User.get_or_none(user_id=user_id).prefetch_related("subscriptions")
 
 	if not user:
@@ -35,12 +35,12 @@ async def success_payment(state: FSMContext, message: Message, user_id: int, cal
 
 	try:
 		defaults = [PriceOptionEnum.ONE_DAY, PriceOptionEnum.ONE_WEEK]
+
 		if not price_option in defaults:
 			if is_vip:
 				best_match = PriceOptionEnum.FREE
 				max_matches = 0
 				tariff_additional = []
-
 				for tariff, services in tariffs.items():
 					tariff_additional_local = set(s for s in services if isinstance(s, PriceOptionEnum))
 					matches = len(tariff_additional_local.intersection(subscriptions))
@@ -74,7 +74,7 @@ async def success_payment(state: FSMContext, message: Message, user_id: int, cal
 
 					await subscription.save()
 
-				user.on_week += tariffs[best_match][0]
+					user.on_week = tariffs[best_match][0]
 				await user.save()
 
 			else:
@@ -92,7 +92,7 @@ async def success_payment(state: FSMContext, message: Message, user_id: int, cal
 						time_expired=datetime.now() + timedelta(weeks=4)
 					)
 
-				user.on_week += on_week
+				user.on_week = on_week
 				await user.save()
 		if price_option == PriceOptionEnum.ONE_DAY:
 			publication_time = datetime.now() + timedelta(days=1)
@@ -143,6 +143,13 @@ async def success_payment(state: FSMContext, message: Message, user_id: int, cal
 			
 			for id in msg_ids:
 				await bot.delete_message(chat_id=message.chat.id, message_id=id)
+
+		await PaymentHistory.create(
+			payment_type=price_option,
+			amount=int(msg["amount"]),
+			invoice_id=invoice_id,
+			user=user
+		)
 
 		await state.clear()
 

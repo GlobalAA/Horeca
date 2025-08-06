@@ -4,10 +4,11 @@ from aiogram import F, Router
 from aiogram.filters import BaseFilter, Command, StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message
+from tortoise.functions import Sum
 
 from callbacks.states import AdminInfoState
 from models.enums import PriceOptionEnum
-from models.models import User, UserRoleEnum, Vacancies
+from models.models import PaymentHistory, User, UserRoleEnum, Vacancies
 
 
 class RoleFilter(BaseFilter):
@@ -35,7 +36,13 @@ async def admin(message: Message):
 	user_with_cvs_count = await User.filter(cvs__isnull=False).distinct().count()
 
 	vacancies_count = await Vacancies.all().count()
+	history_count = await PaymentHistory.all().count()
 
+	top_donater = await User.annotate(total_donated=Sum("history__amount")).filter(history__amount__not_isnull=True).order_by("-total_donated").first()
+	
+	payments = await PaymentHistory.all()
+	payments_sum = sum(p.amount for p in payments)
+	
 	text = "\n".join([
 		"📊 Статистика",
 		"",
@@ -45,7 +52,11 @@ async def admin(message: Message):
 		f"💰 Усього активних підписок: {user_with_subscriptions_count}",
 		f"📰 Кількість резюме: {user_with_cvs_count}",
 		"➖➖➖➖➖",
-		f"👨‍⚕️ Усього вакансій: {vacancies_count}"
+		f"👨‍⚕️ Усього вакансій: {vacancies_count}",
+		"➖➖➖➖➖",
+		f"🤩 Усього куплено підписок/звичайних публікацій: {history_count}",
+		f"💰 Сума покупок користувачів: {payments_sum}",
+		f"⬆️ Користувач, який купив більше всього: {top_donater.username if top_donater.username != "Не визначено" else top_donater.full_name} | {top_donater.user_id}" if top_donater else ""
 	])
 
 	await message.answer(text)

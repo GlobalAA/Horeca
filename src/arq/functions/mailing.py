@@ -136,8 +136,7 @@ async def vacancy_mailing(ctx):
 💰 Заробітна плата: {int(vacancy.salary)} | Ставка: {vacancy.rate}
 📆 Видається з/п: {vacancy.issuance_salary}
 👨‍🦳 Вік: до {vacancy.age_group}
-💡 Досвід роботи: {vacancy.experience.value}
-📰 Додаткова інформація: {vacancy.additional_information if vacancy.additional_information else "Не вказано"}
+💡 Досвід роботи: {vacancy.experience.value}{f"\n📰 Додаткова інформація: {vacancy.additional_information}" if vacancy.additional_information else ""}
 📞 Для зв'язку: {communication_text} | {vacancy.user.full_name}
 📩 Спосіб зв'язку: {vacancy.communications.value}"""
 			

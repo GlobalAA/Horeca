@@ -21,7 +21,7 @@ from .states import CVComments, CVState, VocationState
 
 router = Router()
 
-@router.callback_query(StateFilter(None), F.data == "search_work")
+@router.callback_query(F.data == "search_work")
 async def search_work_callback(callback: CallbackQuery, state: FSMContext):
 	await state.clear()
 	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("cvs")
@@ -38,7 +38,7 @@ async def search_work_callback(callback: CallbackQuery, state: FSMContext):
 	await callback.answer()
 	await push_state(state, CVState.choosing_city)
 
-@router.callback_query(StateFilter(None), F.data == "search_employer")
+@router.callback_query(F.data == "search_employer")
 async def search_employer_callback(callback: CallbackQuery, state: FSMContext):
 	await state.clear()
 	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("vacancies", "subscriptions")

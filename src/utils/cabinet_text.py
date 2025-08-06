@@ -25,10 +25,39 @@ def format_subscriptions(subscriptions: list [Subscription]):
 	return '\n'.join(result_lines)
 
 def get_cabinet_text(callback: CallbackQuery | Message, user: User, len_cv: int, len_published_cv: int, len_vacancies: int, subscriptions: list[Subscription]):
+	tariffs = {
+		PriceOptionEnum.VIP: [10],
+		PriceOptionEnum.VIP_PLUS: [20, PriceOptionEnum.RESUME_SUB],
+		PriceOptionEnum.VIP_MAX: [20, PriceOptionEnum.RESUME_SUB, PriceOptionEnum.VIEW_COMMENTS]
+	}
+
+	best_match = PriceOptionEnum.FREE
+	max_matches = 0
+	tariff_additional = []
+
+	subs_status = [sub.status for sub in subscriptions]
+
+	for tariff, services in tariffs.items():
+		tariff_additional_local = set(s for s in services if isinstance(s, PriceOptionEnum))
+		matches = len(tariff_additional_local.intersection(subs_status))
+
+		if matches > max_matches:
+			tariff_additional = tariff_additional_local
+			max_matches = matches
+			best_match = tariff
+
+	if not best_match and not tariff_additional:
+		best_match = PriceOptionEnum.VIP
+
+	max_week = 0
+	if best_match != PriceOptionEnum.FREE:
+		max_week = tariffs[best_match][0]
+
+	weeks_text = f"\n🍀 Кількість публікацій по підписці: ({user.on_week}/{max_week})"
+	
 	return f"""📇 Ім'я: {callback.from_user.full_name}
 🔑 ID: {callback.from_user.id}
-💰 Баланс: {user.balance} грн
-📅 Дата реєстрації: {user.created_at.strftime("%d.%m.%Y")}
+📅 Дата реєстрації: {user.created_at.strftime("%d.%m.%Y")}{weeks_text if user.on_week > 0 else ""}
 ➖➖➖➖➖
 {format_subscriptions(subscriptions)}
 ➖➖➖➖➖
@@ -62,8 +91,7 @@ def send_vocation(full_name: str, vocations: list[Vacancies | ExperienceVacancy]
 💰 Заробітна плата: {int(vocation_model.salary)} | Ставка: {vocation_model.rate}
 📆 Видається з/п: {vocation_model.issuance_salary}
 👨‍🦳 Вік: до {vocation_model.age_group}
-📰 Додаткова інформація: {vocation_model.additional_information if isinstance(vocation_model, Vacancies) and vocation_model.additional_information else "Не вказано"}
-💡 Досвід роботи: {vocation_model.experience.value if isinstance(vocation_model, Vacancies) else 'Не вказано'}
+💡 Досвід роботи: {vocation_model.experience.value if isinstance(vocation_model, Vacancies) else 'Не вказано'}{f"\n📰 Додаткова інформація: {vocation_model.additional_information}" if  isinstance(vocation_model, Vacancies) and vocation_model.additional_information else ""}
 📞 Для зв'язку: {communication_text} | {full_name}
 📩 Спосіб зв'язку: {vocation_model.communications.value}
 """

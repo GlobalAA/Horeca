@@ -18,7 +18,6 @@ class User(Model):
 	username = fields.CharField(max_length=255, null=True)
 	full_name = fields.CharField(max_length=255)
 	role = fields.CharEnumField(UserRoleEnum)
-	balance = fields.FloatField()
 	last_vacancy_name = fields.CharField(max_length=255, null=True, default=None)
 	
 	on_week = fields.IntField(default=0)
@@ -26,6 +25,18 @@ class User(Model):
 
 	def __str__(self) -> str:
 		return f'{self.user_id} | {self.username}'
+	
+class PaymentHistory(Model):
+	id = fields.IntField(pk=True)
+
+	payment_type = fields.CharEnumField(PriceOptionEnum)
+	amount = fields.IntField()
+	invoice_id = fields.CharField(max_length=255, null=True)
+	created_at = fields.DatetimeField(auto_now_add=True)
+
+	user: fields.ForeignKeyRelation[User] = fields.ForeignKeyField(
+		"models.User", related_name="history"
+	)
 	
 class Subscription(Model):
 	id = fields.IntField(pk=True)
