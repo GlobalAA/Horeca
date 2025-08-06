@@ -11,7 +11,7 @@ from keyboards.cabinet_keyboards import cabinet_keyboard
 from keyboards.city_district_keyboard import city_keyboard
 from keyboards.cv_keyboard import rating_cv_keyboard
 from models.enums import PriceOptionEnum
-from models.models import (Comment, ExperienceVacancy, Subscriptions, User,
+from models.models import (Comment, ExperienceVacancy, Subscription, User,
                            Vacancies)
 from utils import get_min_price, push_state
 from utils.cabinet_text import (comment_slider_button, get_cabinet_text,
@@ -78,7 +78,7 @@ async def back_to_profile(callback: CallbackQuery, state: FSMContext):
 
 	len_published_cv = len([cv for cv in user.cvs if cv.published]) #type: ignore
 
-	subscriptions: list[Subscriptions] = [sub for sub in user.subscriptions] #type: ignore
+	subscriptions: list[Subscription] = [sub for sub in user.subscriptions] #type: ignore
 	
 	text = get_cabinet_text(callback, user, len_cv, len_published_cv, len_vacancies, subscriptions)
 

@@ -3,11 +3,11 @@ from datetime import datetime, timezone
 from aiogram import Bot
 
 from src.models.enums import PriceOptionEnum
-from src.models.models import Subscriptions, Vacancies
+from src.models.models import Subscription, Vacancies
 
 
 async def check_user_time_expired(ctx):
-	subs = await Subscriptions.exclude(status=PriceOptionEnum.FREE).prefetch_related("user")
+	subs = await Subscription.exclude(status=PriceOptionEnum.FREE).prefetch_related("user")
 	for sub in subs:
 		time_expired = sub.time_expired
 

@@ -1,10 +1,13 @@
 bot_token: '7768998421:AAG2bzf82CG-LV1mojxJ945K2-Mclbnv54w'
 db_url: 'postgres://postgres:0904@localhost:5432/Horeca'
+monobank_token: 'uT0VVEvgovyHrI21YabhfZzPfE5p3HJSAca_f4a15w50'
 
 price_options:
-  ONE_DAY: 100
+  ONE_DAY: 50
   ONE_WEEK: 300
   VIP: 2000
+  VIP_PLUS: 3000
+  VIP_MAX: 4000
   RESUME_SUB: 1000
   VIEW_COMMENTS: 1000
 

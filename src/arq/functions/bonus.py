@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 from aiogram import Bot
 
 from src.models.enums import PriceOptionEnum
-from src.models.models import ExperienceVacancy, Subscriptions, Vacancies
+from src.models.models import ExperienceVacancy, Subscription, Vacancies
 
 
 async def get_exactly_experience_vacancy() -> list[ExperienceVacancy]:

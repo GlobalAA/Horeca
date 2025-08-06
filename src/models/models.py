@@ -27,7 +27,7 @@ class User(Model):
 	def __str__(self) -> str:
 		return f'{self.user_id} | {self.username}'
 	
-class Subscriptions(Model):
+class Subscription(Model):
 	id = fields.IntField(pk=True)
 	status = fields.CharEnumField(PriceOptionEnum, default=PriceOptionEnum.FREE)
 	time_expired = fields.DatetimeField(null=True)

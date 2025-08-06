@@ -4,10 +4,10 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from callbacks.types import DeleteVocation, ExperienceVacancyData, ResetData
 from keyboards.back_keyboard import append_back_button
 from models.enums import PriceOptionEnum, UserRoleEnum
-from models.models import ExperienceVacancy, Subscriptions, User, Vacancies
+from models.models import ExperienceVacancy, Subscription, User, Vacancies
 
 
-def format_subscriptions(subscriptions: list [Subscriptions]):
+def format_subscriptions(subscriptions: list [Subscription]):
 	if not subscriptions:
 		return "У вас немає активних підписок🍂"
 	
@@ -24,7 +24,7 @@ def format_subscriptions(subscriptions: list [Subscriptions]):
 		result_lines.append(f"• {text_map[sub.status]} — до <b>{expired}</b>")
 	return '\n'.join(result_lines)
 
-def get_cabinet_text(callback: CallbackQuery | Message, user: User, len_cv: int, len_published_cv: int, len_vacancies: int, subscriptions: list[Subscriptions]):
+def get_cabinet_text(callback: CallbackQuery | Message, user: User, len_cv: int, len_published_cv: int, len_vacancies: int, subscriptions: list[Subscription]):
 	return f"""📇 Ім'я: {callback.from_user.full_name}
 🔑 ID: {callback.from_user.id}
 💰 Баланс: {user.balance} грн

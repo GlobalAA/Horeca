@@ -73,10 +73,12 @@ class RatingCvData(CallbackData, prefix="rate"):
 class CommentData(CallbackData, prefix="comment"):
 	exp_id: int
 
-class FinalDataVocation(CallbackData, prefix="final_voc"):
-	published: bool
+class PriceData(CallbackData, prefix="price_data"):
 	price_option: PriceOptionEnum
 	price: int
+
+class DetailData(CallbackData, prefix="detail_data"):
+	price_option: PriceOptionEnum
 
 class MyCvData(CallbackData, prefix="cv_data"):
 	action: str

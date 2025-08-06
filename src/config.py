@@ -14,6 +14,8 @@ class PriceOptionConfig(BaseModel):
 	RESUME_SUB: int
 	VIEW_COMMENTS: int
 	VIP: int
+	VIP_PLUS: int
+	VIP_MAX: int
 
 class Redis(BaseModel):
 	username: str
@@ -25,6 +27,7 @@ class Config(YamlBaseSettings):
 	bot_token: SecretStr
 	db_url: SecretStr 
 	redis: Redis
+	monobank_token: SecretStr
 
 	price_options: PriceOptionConfig
 

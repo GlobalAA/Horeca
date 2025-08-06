@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import cast
 
 from aiogram import F, Router
@@ -10,20 +10,22 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from callbacks.states import VocationState
 from callbacks.types import (AgeGroupData, BackData, CityData,
-                             CommunicationMethodData, DistrictData,
-                             ExperienceData, FinalDataVocation, ImageData,
+                             CommunicationMethodData, DetailData, DistrictData,
+                             ExperienceData, ImageData, PriceData,
                              RateTypeData, ResetData, SubvocationData,
                              VacancyNameSkip, VocationData)
+from config import config
 from keyboards import (age_group_keyboard, append_back_button, city_keyboard,
                        communication_method_keyboard, district_keyboard,
                        experience_keyboard, last_name_keyboard,
-                       rate_type_keyboard, reset_keyboard,
+                       purchase_keyboard, rate_type_keyboard, reset_keyboard,
                        subvocation_keyboard, vocation_keyboard,
                        vocation_keyboard_price)
 from models.enums import (CommunicationMethodEnum, PriceOptionEnum,
                           RateTypeEnum, UserRoleEnum, VocationEnum)
 from models.models import User, Vacancies
-from utils import validate_phone_number
+from utils import (MonoBankApi, save_vacancy, success_payment,
+                   validate_phone_number)
 from utils.state import push_state
 from utils.validate import percent_validate, validate_telegram_username
 
@@ -408,7 +410,7 @@ async def choosing_photo_id(message: Message, state: FSMContext):
 
 	if not photo:
 		return await message.answer("🔴 Зображення не знайдено")
-
+	await state.update_data(photo=photo)
 	await data_full_get(message, state, message.from_user.id, photo)
 
 @router_employer.callback_query(VocationState.choosing_photo_id, ImageData.filter())
@@ -452,7 +454,8 @@ async def data_full_get(message: Message, state: FSMContext, user_id: int, photo
 💡 Досвід роботи: {data['experience'].value}
 📰 Додаткова інформація: {data['additional_information'] if data.get('additional_information', None) else "Не вказано"}
 📞 Для зв'язку: {communication_text} | {full_name}
-📩 Спосіб зв'язку: {data['communication_data'].value}"""
+📩 Спосіб зв'язку: {data['communication_data'].value}
+"""
 
 	update = data.get('update', False)
 	reset_keyboard_inline = reset_keyboard(role=UserRoleEnum.EMPLOYER, for_update=update).inline_keyboard
@@ -475,127 +478,175 @@ async def data_full_get(message: Message, state: FSMContext, user_id: int, photo
 		await message.answer_photo(photo.file_id, full_data, reply_markup=vocation_final_reset_markup)
 
 	await state.update_data(photo_id=photo.file_id if photo else None)
-	await push_state(state, VocationState.final_state)
+	await push_state(state, VocationState.choosing_price)
 
-@router_employer.callback_query(VocationState.final_state, FinalDataVocation.filter())
-async def vocation_final_state(callback: CallbackQuery, callback_data: FinalDataVocation, state: FSMContext):
+@router_employer.callback_query(VocationState.choosing_price, DetailData.filter())
+async def vocation_get_information(callback: CallbackQuery, callback_data: DetailData, state: FSMContext):
+	text_data = {
+		PriceOptionEnum.VIP: {
+			"text": f"<b>Тариф VIP</b> ({config.price_options.VIP}грн) - 10 оголошень на місяць з розміщенням на тиждень",
+			"price": config.price_options.VIP
+		},
+		PriceOptionEnum.VIP_PLUS: {
+			"text": f"<b>Тариф VIP+</b> ({config.price_options.VIP_PLUS}грн) - 20 оголошень на місяць з розміщенням на тиждень + розсилка резюме",
+			"price": config.price_options.VIP_PLUS
+		},
+		PriceOptionEnum.VIP_MAX: {
+			"text": f"<b>Тариф VIP MAX</b> ({config.price_options.VIP_MAX}грн) - 20 оголошень на місяць з розміщенням на тиждень + розсилка резюме + можливість читати і писати коментарі про претендентів на роботу",
+			"price": config.price_options.VIP_MAX
+		}
+	}
+
+
+	builder = InlineKeyboardBuilder()
+
+	builder.button(text="Обрати", callback_data=PriceData(price_option=callback_data.price_option, price=text_data[callback_data.price_option]["price"]).pack())
+
+	builder.button(text="Ні", callback_data="no_select")
+
+	builder.adjust(2)
+
+	msg = await callback.message.answer(text=f"🍀 Інформація про тариф {text_data[callback_data.price_option]["text"]}", reply_markup=builder.as_markup())
+
 	data = await state.get_data()
+	msg_ids = data.get("msg_ids", []) 
+	msg_ids.append(msg.message_id)
+	await state.update_data(msg_ids=msg_ids)
+
+@router_employer.callback_query(VocationState.choosing_price, F.data == "no_select")
+async def no_select(callback: CallbackQuery, state: FSMContext):
+	message = cast(Message, callback.message)
+
+	await message.delete()
+
+	data = await state.get_data()
+	msg_ids = data.get("msg_ids", []) 
+	
+	if msg_ids:
+		msg_ids.pop()
+		await state.update_data(msg_ids=msg_ids)
+
+@router_employer.callback_query(VocationState.choosing_price, PriceData.filter())
+async def vocation_choosing_price(callback: CallbackQuery, callback_data: PriceData, state: FSMContext):
+	data = await state.get_data()
+
+	msg_ids = data.get("msg_ids", []) 
+	prices_id = data.get("price_ids", [])
+
+	for id in msg_ids:
+		await callback.bot.delete_message(chat_id=callback.from_user.id, message_id=id)
+
+	await state.update_data(msg_ids=[])
+	msg_ids = []
+
+	await callback.answer()
 
 	if not data:
 		return await callback.answer("🔴 Дані не знайдено")
 	
 	user = await User.get_or_none(user_id=callback.from_user.id).prefetch_related("subscriptions")
 
-	update = data.get('update', False)
-	vacancy_id = data.get('update_id', None)
+	text_data = {
+		PriceOptionEnum.ONE_DAY: {
+			"text": "Публікація оголошення на день",
+			"price": 50
+		},
+		PriceOptionEnum.ONE_WEEK: {
+			"text": "Публікація оголошення на тиждень",
+			"price": 300
+		},
+		PriceOptionEnum.VIP: {
+			"text": "Тариф VIP",
+			"price": 2000
+		},
+		PriceOptionEnum.VIP_PLUS: {
+			"text": "Тариф VIP+",
+			"price": 3000
+		},
+		PriceOptionEnum.VIP_MAX: {
+			"text": "Тариф VIP MAX",
+			"price": 4000
+		}
+	}
 
 	message = cast(Message, callback.message)
 
 	if not user:
 		await callback.answer()
 		return await message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
+	
+	current_text = text_data[callback_data.price_option]
 
-	if not update and not vacancy_id:
-		subscriptions: list[PriceOptionEnum] = [sub.status for sub in user.subscriptions] # type: ignore
+	invoice_id: str | None = None
+	invoice_url: str | None = None
+	
+	async with MonoBankApi(config.monobank_token.get_secret_value()) as mono:
+		invoice_data = {
+			"amount": callback_data.price * 100,
+			"ccy": 980,
+			"merchantPaymInfo": {
+				"reference": callback_data.price_option.name,
+				"destination": "Оплата в боті Horeca"
+			},
+			"redirectUrl": "https://t.me/Finance_glb_bot",
+			'validity': timedelta(hours=1).seconds
+		}
 
-		is_vip = PriceOptionEnum.VIP in subscriptions and callback_data.price_option == PriceOptionEnum.VIP
+		invoice = await mono.create_invoice(invoice_data)
 
-		resume_sub_in_subscriptions = PriceOptionEnum.RESUME_SUB in subscriptions
+		invoice_id = invoice.get('invoiceId', 0)
+		invoice_url = invoice.get("pageUrl", None)
 
-		if is_vip:
-			if user.on_week > 0:
-				user.on_week -= 1
-			else:
-				await callback.answer()
-				return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
-		elif callback_data.price_option == PriceOptionEnum.RESUME_SUB:
-			if resume_sub_in_subscriptions:
-				data['resume_sub'] = True
-			else:
-				await callback.answer()
-				return await message.answer("🔴 З вашим тарифом, це зробити неможливо")
-		else:
-			if user.balance <  callback_data.price:
-				await callback.answer()
-				return await message.answer("🔴 На вашому балансі недостатньо коштів для здійснення операції")
-			user.balance -= int(callback_data.price)
+		if invoice_id == 0 or invoice_url == None:
+			return await callback.answer("Помилка. Зверніться до адміністратора!")
+	
 
-		await state.clear()
+	text = f"""Оплата: {current_text["text"]}
+Ціна: {current_text["price"]}грн
+Ідентифікатор транзакції: {invoice_id}
+"""
 
-		delta = timedelta()
+	msg = await message.answer(text, reply_markup=purchase_keyboard(invoice_url, invoice_id))
 
-		if callback_data.price_option in [PriceOptionEnum.VIP, PriceOptionEnum.ONE_WEEK]:
-			delta = timedelta(weeks=1) 
-		if callback_data.price_option == PriceOptionEnum.ONE_DAY:
-			delta = timedelta(days=1) 
-		if callback_data.price_option == PriceOptionEnum.RESUME_SUB:
-			delta = timedelta(weeks=4)
-		
+	prices_id.append(message.message_id)
+	msg_ids.append(msg.message_id)
 
-		new_vocation = Vacancies(
-			city=data['city'],
-			district=data['district'],
-			address = data['address'],
-			name=data['name'],
-			work_schedule=data['work_schedule'],
-			issuance_salary=data['issuance_salary'],
-			vocation=data['vocation'],
-			subvocation=data.get('subvocation', None),
-			age_group=data['age_group'],
-			experience=data['experience'],
-			salary=int(data['salary']),
-			rate=data['rate'],
-			rate_type=data['rate_type'],
-			additional_information=data.get('additional_information', None),
-			phone_number=data.get('phone_number', None),
-			telegram_link=data.get('telegram_link', None),
-			photo_id=data['photo_id'],
-			communications=data['communication_data'],
-			user=user,
-			published=callback_data.published,
-			resume_sub=data.get('resume_sub', False),
-			time_expired=datetime.now() + delta
-		)	
+	await state.update_data(price_ids=prices_id, msg_ids=msg_ids, price_enum=callback_data.price_option, price=callback_data.price)
 
-		user.last_vacancy_name = data['name']	
+@router_employer.callback_query(F.data.startswith("pay_cancel"))
+async def pay_cancel(callback: CallbackQuery, state: FSMContext):
+	invoice_id = callback.data.split(':')[-1]
+	
+	async with MonoBankApi(config.monobank_token.get_secret_value()) as mono:
+		result = await mono.invalidate_invoice(invoice_id)
 
-		await new_vocation.save()
-		await user.save()
+		if not result["success"]:
+			error_result = cast(MonoBankApi.ErrorDict, result)
+			return await callback.message.answer(text=f"{error_result["errCode"]}: {error_result["errText"]}")
+	
+	message = cast(Message, callback.message)
 
-		await callback.answer()
-		await message.reply(f"🟢 Вакансія збережена!")
+	await message.edit_text("⛔️ Транзакцію перервано!")
 
-	else:
-		vacancy = await Vacancies.get_or_none(id=vacancy_id, user=user)
+@router_employer.callback_query(F.data.startswith("pay_check"))
+async def pay_check(callback: CallbackQuery, state: FSMContext):
+	message = cast(Message, callback.message)
 
-		if not vacancy:
-			return await callback.answer("🔴 Вакансію не знайдено")
+	invoice_id = callback.data.split(':')[-1]
+	
+	async with MonoBankApi(config.monobank_token.get_secret_value()) as mono:
+		status, msg = await mono.get_invoice_status(invoice_id)
 
-		vacancy.city = data['city']
-		vacancy.district = data['district']
-		vacancy.address = data['address']
-		vacancy.name = data['name']
-		vacancy.work_schedule = data['work_schedule']
-		vacancy.issuance_salary = data['issuance_salary']
-		vacancy.vocation = data['vocation']
-		vacancy.subvocation = data.get('subvocation', None)
-		vacancy.age_group = data['age_group']
-		vacancy.experience = data['experience']
-		vacancy.salary = int(data['salary'])
-		vacancy.rate = data['rate']
-		vacancy.rate_type = data['rate_type']
-		vacancy.additional_information = data.get('additional_information', None)
-		vacancy.phone_number = data.get('phone_number', None)
-		vacancy.telegram_link = data.get('telegram_link', None)
-		vacancy.photo_id = data['photo_id']
-		vacancy.communications = data['communication_data']
-		vacancy.published = vacancy.published
-		vacancy.resume_sub = data.get('resume_sub', False)
-
-		user.last_vacancy_name = data['name']	
-
-		await vacancy.save()
-		await user.save()
-
-		await callback.answer()
-		await message.reply(f"🟢 Вакансія оновлена!")
+		match status:
+			case MonoBankApi.Status.PROCESSING:
+				return await callback.answer("Транзакція ще обробляється")
+			case MonoBankApi.Status.FAILURE:
+				return await callback.answer(msg["failureReason"])
+			case MonoBankApi.Status.EXPIRED:
+				await message.delete()
+				return await callback.answer("Транзакція вже не дійсна!")
+			case MonoBankApi.Status.SUCCESS:
+				return await success_payment(state, message, callback.from_user.id, callback)
+			case _:
+				return await callback.answer("Не вдалось перевірити статус")
+	
