@@ -76,7 +76,8 @@ async def get_cvs(callback: CallbackQuery):
 	if cv.photo_id:
 		return await message.answer_photo(cv.photo_id, caption=text, reply_markup=await get_cvs_keyboard(user_id=callback.from_user.id))
 	
-	await message.edit_text(text=text, reply_markup=await get_cvs_keyboard(user_id=callback.from_user.id))
+	await message.delete()
+	await message.answer(text=text, reply_markup=await get_cvs_keyboard(user_id=callback.from_user.id))
 
 @cabinet_router.callback_query(UnPublishCv.filter())
 async def unpublish_cv(callback: CallbackQuery, callback_data: UnPublishCv):
@@ -139,7 +140,8 @@ async def vocation_get(callback: CallbackQuery, state: FSMContext):
 	if vacancy.photo_id:
 		return await message.answer_photo(vacancy.photo_id, caption=text, reply_markup=markup)
 	
-	await message.edit_text(text=text, reply_markup=markup)
+	await message.delete()
+	await message.answer(text=text, reply_markup=markup)
 
 @cabinet_router.callback_query(DeleteVocation.filter())
 async def delete_vocation(callback: CallbackQuery, callback_data: DeleteVocation, state: FSMContext):

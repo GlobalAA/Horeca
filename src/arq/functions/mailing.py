@@ -39,6 +39,8 @@ async def cv_mailing(ctx):
 
 			bot: Bot = ctx['bot']
 			for cv in cvs:
+				if cv.user.user_id == vacancy.user.user_id:
+					continue
 				experiences = await ExperienceVacancy.filter(cv=cv).all()
 
 				if vacancy.id in cv.vacancies_ids:
@@ -83,9 +85,9 @@ async def cv_mailing(ctx):
 📞 Телефон: {cv.phone_number}"""
 				
 				if cv.photo_id:
-					await bot.send_photo(cv.user.user_id, cv.photo_id, caption=text, reply_markup=await get_cvs_keyboard())
+					await bot.send_photo(vacancy.user.user_id, cv.photo_id, caption=text, reply_markup=await get_cvs_keyboard())
 				else:
-					await bot.send_message(cv.user.user_id, text=text, reply_markup=await get_cvs_keyboard())
+					await bot.send_message(vacancy.user.user_id, text=text, reply_markup=await get_cvs_keyboard())
 
 				cv.vacancies_ids.append(vacancy.id)
 				await cv.save()
@@ -113,6 +115,8 @@ async def vacancy_mailing(ctx):
 		vacancies = await Vacancies.filter(**filters).all().prefetch_related("user")
 
 		for vacancy in vacancies:
+			if cv.user.user_id == vacancy.user.user_id:
+					continue
 			bot: Bot = ctx['bot']
 
 			if cv.id in vacancy.cvs_id:

@@ -4,10 +4,8 @@ from aiogram import Router
 from aiogram.filters import Command, CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import BufferedInputFile, Message
-from aiogram.utils.chat_action import ChatActionSender
 from fpdf import FPDF
 
-from constants import bot
 from keyboards import start_keyboard
 from keyboards.cabinet_keyboards import cabinet_keyboard
 from models.models import (PaymentHistory, PriceOptionEnum, Subscription, User,
@@ -17,7 +15,7 @@ from utils.cabinet_text import get_cabinet_text
 router = Router()
 
 @router.message(CommandStart())
-async def start_message(message: Message, state: FSMContext):
+async def start_message(message: Message):
 	await message.answer(f"Вітаємо, {message.from_user.first_name}!\nЗа допомогою даного боту Ви можете швидко й зручно знайти співробітника для свого закладу або бажану роботу.", reply_markup=start_keyboard())
 
 	username = message.from_user.username
@@ -61,39 +59,38 @@ async def cabinet(message: Message):
 
 	with_history = await user.history.all().count() > 0 #type: ignore
 
-	async with ChatActionSender.upload_document(bot=bot, chat_id=message.chat.id):
-		if with_history:
-			pdf = FPDF()
-			pdf.add_page()
-			pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
-			pdf.set_font("DejaVu", size=12)
+	if with_history:
+		pdf = FPDF()
+		pdf.add_page()
+		pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+		pdf.set_font("DejaVu", size=12)
 
-			history: list[PaymentHistory] = await user.history.all() #type: ignore
+		history: list[PaymentHistory] = await user.history.all() #type: ignore
 
-			for h in history:
-				text_pdf = (
-					f"Ідентифікатор: {h.invoice_id}\n"
-					f"Створено: {h.created_at.strftime('%d.%m.%Y %H:%M')}\n"
-					f"Ціна: {h.amount}грн\n"
-					f"Товар: {h.payment_type.value}\n\n"
-				)
-
-				pdf.multi_cell(0, 10, text_pdf, align="L")
-			
-			pdf_bytes = pdf.output(dest='S')
-			if isinstance(pdf_bytes, bytearray):
-				pdf_bytes = bytes(pdf_bytes)
-
-			pdf_buffer = BytesIO(pdf_bytes)
-			pdf_buffer.seek(0)
-
-			input_file = BufferedInputFile(pdf_buffer.getvalue(), filename="payment_history.pdf")
-
-			return await message.answer_document(
-				document=input_file,
-				caption=text,
-				reply_markup=cabinet_keyboard()
+		for h in history:
+			text_pdf = (
+				f"Ідентифікатор: {h.invoice_id}\n"
+				f"Створено: {h.created_at.strftime('%d.%m.%Y %H:%M')}\n"
+				f"Ціна: {h.amount}грн\n"
+				f"Товар: {h.payment_type.value}\n\n"
 			)
+
+			pdf.multi_cell(0, 10, text_pdf, align="L")
+		
+		pdf_bytes = pdf.output(dest='S')
+		if isinstance(pdf_bytes, bytearray):
+			pdf_bytes = bytes(pdf_bytes)
+
+		pdf_buffer = BytesIO(pdf_bytes)
+		pdf_buffer.seek(0)
+
+		input_file = BufferedInputFile(pdf_buffer.getvalue(), filename="payment_history.pdf")
+
+		return await message.answer_document(
+			document=input_file,
+			caption=text,
+			reply_markup=cabinet_keyboard()
+		)
 	
 	await message.answer(text, reply_markup=cabinet_keyboard())
 

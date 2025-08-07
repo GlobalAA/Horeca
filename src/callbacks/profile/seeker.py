@@ -499,7 +499,6 @@ async def cv_final_state(callback: CallbackQuery, callback_data: FinalDataCv, st
 			elif key.startswith("experience_name_") and "_set" in key:
 				experience_indices.add(key.split("_")[2])
 
-
 		for index in experience_indices:
 			exp_name = data.get(f"experience_{index}_name")
 			if not exp_name:
@@ -515,10 +514,12 @@ async def cv_final_state(callback: CallbackQuery, callback_data: FinalDataCv, st
 
 			if vacancy_id:
 				vacancy = await Vacancies.get_or_none(id=vacancy_id).prefetch_related("user")
-				if not vacancy:
-					vacancy = await ExperienceVacancy.get_or_none(id=vacancy_id).prefetch_related("user")
 
-				subscriptions = [sub.status for sub in user.subscriptions] # type: ignore
+				if not vacancy:
+					vacancy = await ExperienceVacancy.get_or_none(id=vacancy_id).prefetch_related("user", "subscriptions")
+
+				vac_user = await User.get_or_none(id=vacancy.user.id).prefetch_related("subscriptions")
+				subscriptions = [sub.status for sub in vac_user.subscriptions] # type: ignore
 		
 				if not vacancy:
 					return await message.answer("🔴 Сталася помилка, вакансію не знайдено, зверніться до адміністратора!")
@@ -547,6 +548,7 @@ async def cv_final_state(callback: CallbackQuery, callback_data: FinalDataCv, st
 
 			await exp_vac.save()
 			if vacancy_id and PriceOptionEnum.VIEW_COMMENTS in subscriptions:
+				print(f"Send to {vacancy.user.full_name}")
 				caption = f"🟢 Користувач (<b><i>{full_name}</i></b>) вибрав ваш заклад (<b><i>{vacancy.name}</i></b>) в якості минулого місця роботи!\n\n{full_data}"
 				if new_cv.photo_id:
 					msg = await bot.send_photo(vacancy.user.user_id, photo=new_cv.photo_id, caption=caption, reply_markup=rating_cv_button(exp_id=exp_vac.id))
