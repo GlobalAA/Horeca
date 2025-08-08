@@ -138,3 +138,15 @@ class EditCvEnum(Enum):
 	VACATION = "VACATION"
 	SALARY = "SALARY"
 	PHONE_NUMBER = "PHONE_NUMBER"
+
+class SliderValue:
+	NEXT = "next"
+	BACK = "back"
+
+class ResumeSliderEnum(Enum):
+	NEXT = SliderValue.NEXT
+	BACK = SliderValue.BACK
+
+class VocationSliderEnum(Enum):
+	NEXT = SliderValue.NEXT
+	BACK = SliderValue.BACK

@@ -4,8 +4,8 @@ from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from src.models.enums import DistrictEnum
-from src.models.models import CVs, ExperienceVacancy, Vacancies
+from src.models.enums import DistrictEnum, PriceOptionEnum
+from src.models.models import CVs, ExperienceVacancy, User, Vacancies
 
 
 async def get_cvs_keyboard() -> InlineKeyboardMarkup:
@@ -74,7 +74,7 @@ async def cv_mailing(ctx):
 
 				text = f"""{cv.user.full_name}
 ➖➖➖➖➖
-♟ {vocation}
+♟ Шукає: {vocation}
 📍 Місто: {cv.city.value}
 🏠 Район: {cv.district}
 💰 Мінімальна з/п: {cv.min_salary}
@@ -84,10 +84,18 @@ async def cv_mailing(ctx):
 ➖➖➖➖➖
 📞 Телефон: {cv.phone_number}"""
 				
+				user_sub = await User.get_or_none(user_id=vacancy.user.user_id).prefetch_related("subscriptions")
+
+				view_comments = False
+
+				if user_sub:
+					subscriptions = [sub.status for sub in user_sub.subscriptions] #type: ignore
+					view_comments = PriceOptionEnum.VIEW_COMMENTS in subscriptions
+
 				if cv.photo_id:
-					await bot.send_photo(vacancy.user.user_id, cv.photo_id, caption=text, reply_markup=await get_cvs_keyboard())
+					await bot.send_photo(vacancy.user.user_id, cv.photo_id, caption=text, reply_markup=await get_cvs_keyboard() if view_comments else None)
 				else:
-					await bot.send_message(vacancy.user.user_id, text=text, reply_markup=await get_cvs_keyboard())
+					await bot.send_message(vacancy.user.user_id, text=text, reply_markup=await get_cvs_keyboard() if view_comments else None)
 
 				cv.vacancies_ids.append(vacancy.id)
 				await cv.save()
@@ -135,7 +143,7 @@ async def vacancy_mailing(ctx):
 ➖➖➖➖➖
 📍 Місто: {vacancy.city.value}
 🏠 Район: {vacancy.district}
-♟ {vocation}
+♟ Шукає: {vocation}
 ⏱️ Графік роботи: {vacancy.work_schedule}
 💰 Заробітна плата: {int(vacancy.salary)} | Ставка: {vacancy.rate}
 📆 Видається з/п: {vacancy.issuance_salary}

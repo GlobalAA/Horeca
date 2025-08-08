@@ -63,7 +63,7 @@ async def get_cvs(callback: CallbackQuery):
 
 	text = f"""{callback.from_user.full_name if not full_name else full_name}
 ➖➖➖➖➖
-♟ {vocation}
+♟ Шукає: {vocation}
 📍 Місто: {cv.city.value}
 🏠 Район: {cv.district}
 💰 Мінімальна з/п: {cv.min_salary}
@@ -127,7 +127,7 @@ async def vocation_get(callback: CallbackQuery, state: FSMContext):
 	if not user:
 		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 	
-	vacancies: list[Vacancies | ExperienceVacancy] = await user.vacancies.all() #type: ignore
+	vacancies: list[Vacancies] = await user.vacancies.all() #type: ignore
 	if len(vacancies) <= 0:
 		return await callback.answer("У вас ще немає створених вакансій")
 	vacancy: Vacancies | ExperienceVacancy = await vacancies[0]

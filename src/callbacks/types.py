@@ -2,8 +2,8 @@ from aiogram.filters.callback_data import CallbackData
 
 from models.enums import (AgeGroupEnum, CityEnum, CommunicationMethodEnum,
                           EditCvEnum, ExperienceEnum, ExperienceTypeEnum,
-                          PriceOptionEnum, RateTypeEnum, UserRoleEnum,
-                          VocationEnum)
+                          PriceOptionEnum, RateTypeEnum, ResumeSliderEnum,
+                          UserRoleEnum, VocationEnum, VocationSliderEnum)
 
 
 class CityData(CallbackData, prefix="city"):
@@ -65,6 +65,16 @@ class ResetData(CallbackData, prefix="reset"):
 
 class FinalDataCv(CallbackData, prefix="final"):
 	published: bool
+
+class ResumeSubNextData(CallbackData, prefix="resume_sub_next"):
+	index: int
+	total: int
+	type: ResumeSliderEnum
+
+class VocationNextData(CallbackData, prefix="vocation_next"):
+	index: int
+	total: int
+	type: VocationSliderEnum
 
 class RatingCvData(CallbackData, prefix="rate"):
 	exp_id: int

@@ -1,9 +1,8 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from aiogram import Bot
 
-from src.models.enums import PriceOptionEnum
-from src.models.models import ExperienceVacancy, Subscription, Vacancies
+from src.models.models import ExperienceVacancy, Vacancies
 
 
 async def get_exactly_experience_vacancy() -> list[ExperienceVacancy]:

@@ -48,7 +48,7 @@ async def check_vacancy_time_expired(ctx):
 ➖➖➖➖➖
 📍 Місто: {vacancy.city.value}
 🏠 Район: {vacancy.district}
-♟ {vocation}
+♟ Шукає: {vocation}
 ⏱️ Графік роботи: {vacancy.work_schedule}
 💰 Заробітна плата: {int(vacancy.salary)} | Ставка: {vacancy.rate}
 📆 Видається з/п: {vacancy.issuance_salary}

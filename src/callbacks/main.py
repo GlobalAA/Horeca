@@ -97,7 +97,7 @@ async def slider_navigate(callback: CallbackQuery, state: FSMContext):
 	if not user:
 		return await callback.message.answer("🔴 Сталася помилка, користувача не знайдено, зверніться до адміністратора!")
 
-	vacancies: list[Vacancies | ExperienceVacancy] = []
+	vacancies = []
 	view_all = callback.data.split(':')[-1] == "True"
 
 	for v in data['vacancies']:
@@ -105,13 +105,7 @@ async def slider_navigate(callback: CallbackQuery, state: FSMContext):
 		if data_vac:
 			vacancies.append(data_vac)
 
-	if data.get('experience_vacancies', None) != None:
-		for v in data['experience_vacancies']:
-			data_experience_vacancies = await ExperienceVacancy.get_or_none(id=int(v))
-			if data_experience_vacancies != None:
-				vacancies.append(data_experience_vacancies)
-
-	current_vacancy: Vacancies | ExperienceVacancy = vacancies[index]
+	current_vacancy: Vacancies = vacancies[index]
 
 	if not vacancies:
 		await callback.message.answer("Немає записів.")

@@ -1,9 +1,8 @@
 from models.models import ExperienceVacancy
 
 
-async def get_exactly_experience_vacancy(filters: dict[str, str]) -> list[ExperienceVacancy]:
-	filters.pop('experience', None)
-	qs = ExperienceVacancy.filter(**filters).prefetch_related("user")
+async def get_exactly_experience_vacancy() -> list[ExperienceVacancy]:
+	qs = ExperienceVacancy.all().prefetch_related("user")
 	count = await qs.count()
 
 	if count < 10:

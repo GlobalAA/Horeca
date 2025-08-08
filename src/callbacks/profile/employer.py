@@ -794,5 +794,5 @@ async def pay_check(callback: CallbackQuery, state: FSMContext):
 			case MonoBankApi.Status.SUCCESS:
 				return await success_payment(state, message, callback.from_user.id, callback, msg, invoice_id)
 			case _:
-				return await callback.answer("Ви ще не взаємодіяли з рахунком")
+				return await callback.answer("Ви ще не провели платіж")
 	

@@ -67,7 +67,7 @@ def get_cabinet_text(callback: CallbackQuery | Message, user: User, len_cv: int,
 📰 Кількість створених вакансій: {len_vacancies} шт
 """
 
-def send_vocation(full_name: str, vocations: list[Vacancies | ExperienceVacancy], index: int, total: int, view_all: bool = False) -> tuple[str, InlineKeyboardMarkup]:
+def send_vocation(full_name: str, vocations: list[Vacancies], index: int, total: int, view_all: bool = False) -> tuple[str, InlineKeyboardMarkup]:
 	vocation_model = vocations[index]
 	phone_number = vocation_model.phone_number
 	telegram_link = vocation_model.telegram_link
@@ -91,7 +91,7 @@ def send_vocation(full_name: str, vocations: list[Vacancies | ExperienceVacancy]
 💰 Заробітна плата: {int(vocation_model.salary)} | Ставка: {vocation_model.rate}
 📆 Видається з/п: {vocation_model.issuance_salary}
 👨‍🦳 Вік: до {vocation_model.age_group}
-💡 Досвід роботи: {vocation_model.experience.value if isinstance(vocation_model, Vacancies) else 'Не вказано'}{f"\n📰 Додаткова інформація: {vocation_model.additional_information}" if  isinstance(vocation_model, Vacancies) and vocation_model.additional_information else ""}
+💡 Досвід роботи: {vocation_model.experience.value if vocation_model.experience else 'Не вказано'}{f"\n📰 Додаткова інформація: {vocation_model.additional_information}" if  vocation_model.additional_information else ""}
 📞 Для зв'язку: {communication_text} | {full_name}
 📩 Спосіб зв'язку: {vocation_model.communications.value}
 """
@@ -114,6 +114,9 @@ def send_vocation(full_name: str, vocations: list[Vacancies | ExperienceVacancy]
 		builder.button(text="Продовжити термін публікації", callback_data="extend_publication")
 
 	if view_all:
+		text = f"""📍 <i>{vocation_model.name}</i>
+♟ {vocation}
+"""
 		builder.button(text="🟢 Обрати", callback_data=ExperienceVacancyData(vacancy_id=vocation_model.id))
 		
 		if index > 0 and index < total - 1:

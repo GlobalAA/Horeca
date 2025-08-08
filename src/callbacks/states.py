@@ -8,6 +8,7 @@ class CVState(StatesGroup):
 	choosing_subvocation = State()
 	choosing_age_group = State()
 	choosing_experience = State()
+	choosing_experience_search = State()
 	choosing_experience_type = State()
 	choosing_experience_name = State()
 	choosing_experience_vacancy = State()
