@@ -31,7 +31,7 @@ async def vacancy_bonus(ctx):
 	bot: Bot = ctx['bot']
 
 	for vacancy in exp_vacancies:
-		vacancy_model = await Vacancies.get_or_none(name=vacancy.name, city=vacancy.city, vocation=vacancy.vocation)
+		vacancy_model = await Vacancies.filter(name=vacancy.name, city=vacancy.city, vocation=vacancy.vocation).first()
 		
 		if not vacancy_model:
 			continue

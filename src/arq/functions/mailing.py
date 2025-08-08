@@ -84,7 +84,7 @@ async def cv_mailing(ctx):
 ➖➖➖➖➖
 📞 Телефон: {cv.phone_number}"""
 				
-				user_sub = await User.get_or_none(user_id=vacancy.user.user_id).prefetch_related("subscriptions")
+				user_sub = await User.filter(user_id=vacancy.user.user_id).prefetch_related("subscriptions")
 
 				view_comments = False
 
