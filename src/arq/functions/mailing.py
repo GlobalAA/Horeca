@@ -3,9 +3,11 @@ import asyncio
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from tortoise.expressions import Q
 
 from src.models.enums import DistrictEnum, PriceOptionEnum
 from src.models.models import CVs, ExperienceVacancy, User, Vacancies
+from utils import is_suitable
 
 
 async def get_cvs_keyboard() -> InlineKeyboardMarkup:
@@ -17,22 +19,21 @@ async def get_cvs_keyboard() -> InlineKeyboardMarkup:
 
 async def cv_mailing(ctx):
 	try:
-		vacancies = await Vacancies.filter(resume_sub=True).all()
+		vacancies = await Vacancies.filter(resume_sub=True).all().prefetch_related("user")
 
 		for vacancy in vacancies:
-			filters = {
-				'city': vacancy.city,
-				'vocation': vacancy.vocation,
-				'age_group__lte': int(vacancy.age_group),
-				'min_salary__lt': vacancy.salary
-			}
+			filters = Q(
+				city=vacancy.city,
+				vocation=vacancy.vocation,
+				age_group__lte=int(vacancy.age_group),
+				min_salary__lte=vacancy.salary,
+				desired_salary__lte=vacancy.salary
+			)
 
 			if vacancy.subvocation:
-				filters['subvocation'] = vacancy.subvocation
-			if vacancy.district != DistrictEnum.ALL.value[0]:
-				filters['district'] = vacancy.district
+				filters &= Q(subvocation=vacancy.subvocation)
 
-			cvs = await CVs.filter(**filters).prefetch_related("user").all()
+			cvs = await CVs.filter(filters).prefetch_related("user").all()
 
 			if not cvs:
 				continue
@@ -40,6 +41,8 @@ async def cv_mailing(ctx):
 			bot: Bot = ctx['bot']
 			for cv in cvs:
 				if cv.user.user_id == vacancy.user.user_id:
+					continue
+				if not is_suitable(cv.experience_enum, vacancy.experience):
 					continue
 				experiences = await ExperienceVacancy.filter(cv=cv).all()
 
@@ -84,7 +87,7 @@ async def cv_mailing(ctx):
 ➖➖➖➖➖
 📞 Телефон: {cv.phone_number}"""
 				
-				user_sub = await User.filter(user_id=vacancy.user.user_id).prefetch_related("subscriptions")
+				user_sub = await User.filter(user_id=vacancy.user.user_id).first().prefetch_related("subscriptions")
 
 				view_comments = False
 
@@ -97,6 +100,8 @@ async def cv_mailing(ctx):
 				else:
 					await bot.send_message(vacancy.user.user_id, text=text, reply_markup=await get_cvs_keyboard() if view_comments else None)
 
+				print("Sended")
+
 				cv.vacancies_ids.append(vacancy.id)
 				await cv.save()
 
@@ -108,23 +113,20 @@ async def vacancy_mailing(ctx):
 	cvs = await CVs.all().prefetch_related("user")
 	
 	for cv in cvs:
-		filters = {
-			'city': cv.city,
-			'vocation': cv.vocation,
-			'age_group__gte': cv.age_group,
-			'salary__gt': cv.min_salary
-		}
+		filters = Q(
+			city=cv.city,
+			vocation=cv.vocation,
+			age_group__gte=cv.age_group,
+			salary__gte=max(cv.min_salary, cv.desired_salary)
+		)
 
-		if cv.subvocation:
-			filters['subvocation'] = cv.subvocation
-		if cv.district != DistrictEnum.ALL.value[0]:
-			filters['district'] = cv.district
-
-		vacancies = await Vacancies.filter(**filters).all().prefetch_related("user")
+		vacancies = await Vacancies.filter(filters).all().prefetch_related("user")
 
 		for vacancy in vacancies:
+			if not is_suitable(cv.experience_enum, vacancy.experience):
+				continue
 			if cv.user.user_id == vacancy.user.user_id:
-					continue
+				continue
 			bot: Bot = ctx['bot']
 
 			if cv.id in vacancy.cvs_id:

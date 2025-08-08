@@ -6,10 +6,12 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import (CallbackQuery, InlineKeyboardMarkup,
                            InputMediaPhoto, Message)
 from aiogram.utils.keyboard import InlineKeyboardBuilder
+from tortoise.expressions import Q
 
 from callbacks.types import ResumeSubNextData
 from models.enums import DistrictEnum, PriceOptionEnum, ResumeSliderEnum
 from models.models import CVs, ExperienceVacancy, Subscription, User, Vacancies
+from utils.suitable import is_suitable
 
 
 class SubscriptionFilter(BaseFilter):
@@ -116,19 +118,22 @@ async def search_command(message: Message, state: FSMContext):
 	cvs_id: list[int] = data.get('cvs_id', [])
 
 	for vacancy in vacancies:
-		filters = {
-			'city': vacancy.city,
-			'vocation': vacancy.vocation,
-			'age_group__lte': int(vacancy.age_group),
-			'min_salary__lt': vacancy.salary
-		}
+		filters = Q(
+			city=vacancy.city,
+			vocation=vacancy.vocation,
+			age_group__lte=int(vacancy.age_group),
+			min_salary__lte=vacancy.salary,
+			desired_salary__lte=vacancy.salary
+		)
 
 		if vacancy.subvocation:
-			filters['subvocation'] = vacancy.subvocation
-		if vacancy.district != DistrictEnum.ALL.value[0]:
-			filters['district'] = vacancy.district
+			filters &= Q(subvocation=vacancy.subvocation)
 		
-		cvs: list[CVs] = await CVs.filter(**filters).all()
+		cvs: list[CVs] = await CVs.filter(filters).all()
+
+		for cv in cvs:
+			if not is_suitable(cv.experience_enum, vacancy.experience):
+				continue
 		
 		cvs_id.extend([cv.id for cv in cvs])
 		if len(cvs_id) > 0:

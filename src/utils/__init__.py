@@ -6,5 +6,6 @@ from .mono import MonoBankApi
 from .save_vacancy import save_vacancy
 from .state import push_state
 from .success_payment import success_payment
+from .suitable import is_suitable
 from .validate import (percent_validate, validate_phone_number,
                        validate_telegram_username)

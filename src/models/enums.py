@@ -72,7 +72,7 @@ class ExperienceEnum(Enum):
 	ONE_TO_TWO_YEARS = "1-2 роки"
 	TWO_TO_THREE_YEARS = "2-3 роки"
 	THREE_TO_FIVE_YEARS = "3-5 років"
-	
+		
 class ExperienceTypeEnum(Enum):
 	NAME = "NAME"
 	VACANCY = "VACANCY"

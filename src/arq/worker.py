@@ -95,8 +95,8 @@ class WorkerSettings(WorkerSettingsBase):
 		cron(check_user_time_expired, hour=8, minute=0, second=0, unique=True),
 		cron(check_vacancy_time_expired, hour=8, minute=3, second=0, unique=True),
 		cron(vacancy_bonus, hour=set(range(9, 24)), minute=0, second=0, unique=True),
-		cron(vacancy_mailing, hour=set(range(9, 24)), minute=0, second=0, unique=True),
-		cron(cv_mailing, hour=set(range(9, 24)), minute=0, second=0, unique=True) 
+		# cron(vacancy_mailing, minute=set(range(0, 60)), second=0, unique=True),
+		cron(cv_mailing, minute=set(range(0, 60)), second=0, unique=True) 
 	]
 
 if __name__ == "__main__":
